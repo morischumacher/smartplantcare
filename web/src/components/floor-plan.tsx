@@ -224,6 +224,18 @@ export function FloorPlanMap({
                   {f.label}
                 </text>
               )}
+              {!compact && f.height_m ? (
+                <text
+                  x={f.x + f.w / 2}
+                  y={f.y + f.h / 2 + size * 1.1}
+                  fontSize={size * 0.75}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  className="pointer-events-none fill-stone-400 dark:fill-stone-400"
+                >
+                  {num(f.height_m, 1)} m hoch
+                </text>
+              ) : null}
             </g>
           );
         })}

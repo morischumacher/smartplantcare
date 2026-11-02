@@ -42,7 +42,8 @@ export interface FloorPlan {
   depth_m: number;
   outline: [number, number][];
   features: { kind: "window" | "door" | "heater"; x1: number; y1: number; x2: number; y2: number }[];
-  furniture: { label: string; x: number; y: number; w: number; h: number }[];
+  /** w × h is the footprint; height_m how tall it is (shelves, cupboards), optional. */
+  furniture: { label: string; x: number; y: number; w: number; h: number; height_m?: number | null }[];
   source: "ai" | "manual" | "scan";
   generated_at?: string;
 }

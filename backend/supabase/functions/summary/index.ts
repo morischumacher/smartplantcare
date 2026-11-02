@@ -1,6 +1,7 @@
 // Compact, read-only overview for all clients (web app, Scriptable widget, Garmin glance).
 //
-// GET /functions/v1/summary
+// GET /functions/v1/summary            full overview (web app)
+// GET /functions/v1/summary?view=compact   slim list for the Scriptable widget and the Garmin glance
 // Header: x-read-token: <SUMMARY_TOKEN>   (widget, Garmin)
 //    or: Authorization: Bearer <user access token>   (web app)
 //
@@ -9,6 +10,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { secretsMatch } from "../ingest/validate.ts";
+import { compactSummary } from "../_shared/compact.ts";
 import { type HourPoint, type PlantInput, type PlantSummary, type Pot, type PotPeriod, summarize } from "../_shared/watering.ts";
 
 const supabase = createClient(
@@ -161,7 +163,7 @@ async function buildSummary(now: number) {
   type RoomEntry = {
     id: string | null;
     name: string;
-    climate: Record<string, unknown> | null;
+    climate: { temperature: number | null; humidity: number | null; status: string; [k: string]: unknown } | null;
     floor_plan: unknown;
     plants: typeof plantSummaries;
   };
@@ -205,7 +207,8 @@ Deno.serve(async (req) => {
   if (req.method !== "GET") return json(405, { error: "method not allowed" });
   if (!(await authorized(req))) return json(401, { error: "unauthorized" });
   try {
-    return json(200, await buildSummary(Date.now()));
+    const summary = await buildSummary(Date.now());
+    return json(200, new URL(req.url).searchParams.get("view") === "compact" ? compactSummary(summary) : summary);
   } catch (e) {
     console.error("summary failed", e);
     return json(500, { error: "database error" });

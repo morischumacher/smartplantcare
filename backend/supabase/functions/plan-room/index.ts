@@ -47,7 +47,8 @@ Grundriss:
   ca. 90 cm hoch, Raumhöhe ca. 2,5 m).
 - outline: Umriss als Polygon im Uhrzeigersinn; bei einem rechteckigen Raum die vier Ecken.
 - features: Fenster, Türen und Heizkörper als Strecke entlang der Wand, an der sie sitzen.
-- furniture: nur große Möbel (Sofa, Tisch, Bett, Regal, Schrank) als Rechtecke mit kurzem deutschem Namen.
+- furniture: nur große Möbel (Sofa, Tisch, Bett, Regal, Schrank) als Rechtecke mit kurzem deutschem Namen
+  und ihrer Höhe (height_m) – darauf stehende Pflanzen haben dann ungefähr diese Höhe.
 
 Pflanzen:
 - plants: Standort jeder bereits angelegten Pflanze (Mitte des Topfs), erkannt anhand der Referenzfotos.
@@ -107,8 +108,9 @@ function schema(plantIds: string[]) {
             y: { type: "number" },
             w: { type: "number" },
             h: { type: "number" },
+            height_m: { type: "number", description: "wie hoch das Möbel ist, in Metern" },
           },
-          required: ["label", "x", "y", "w", "h"],
+          required: ["label", "x", "y", "w", "h", "height_m"],
           additionalProperties: false,
         },
       },
@@ -165,7 +167,7 @@ type Plan = {
   depth_m: number;
   outline: { x: number; y: number }[];
   features: { kind: string; x1: number; y1: number; x2: number; y2: number }[];
-  furniture: { label: string; x: number; y: number; w: number; h: number }[];
+  furniture: { label: string; x: number; y: number; w: number; h: number; height_m: number }[];
   plants: { plant_id: string; found: boolean; x: number; y: number; height_m: number; confidence: string }[];
   new_plants: {
     description: string;
@@ -226,6 +228,7 @@ function normalize(
           y,
           w: round(Math.min(Math.max(f.w, 0.2), w - INSET - x)),
           h: round(Math.min(Math.max(f.h, 0.2), d - INSET - y)),
+          height_m: f.height_m > 0 ? level(f.height_m) : null,
         };
       }),
       source: "ai",

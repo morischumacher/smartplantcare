@@ -1,0 +1,5 @@
+source/Secrets.mc
+bin/
+*.der
+*.pem
+*.prg

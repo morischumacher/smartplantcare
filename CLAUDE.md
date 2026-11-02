@@ -83,5 +83,5 @@ npm run build && npm run lint && npm test   # test: IFC-Umrechnung (src/lib/*.te
 - [x] Schritt 3: `summary` + Gieß-Logik (Lernen, Umtopfen, Gießen erkennen), Foto-Tagebuch + KI-Check (`analyze-photo`)
 - [ ] Schritt 4: Web-App – gebaut (Übersicht, Pflanze, Tagebuch, Raumkarte mit KI-Grundriss, LiDAR-Scan und Pflanzenerkennung, Artendatenbank, Einstellungen), Deploy auf Vercel steht aus
 - [ ] Schritt 5: ntfy
-- [ ] Schritt 6: Scriptable
-- [ ] Schritt 7: Garmin
+- [ ] Schritt 6: Scriptable – Widget fertig und getestet (`node --test scriptable/test/`), Einrichtung am iPhone steht aus
+- [ ] Schritt 7: Garmin – Code geschrieben, aber noch nie kompiliert (SDK fehlt hier); Build im Simulator steht aus

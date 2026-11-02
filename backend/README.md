@@ -46,6 +46,8 @@ x-read-token: <SUMMARY_TOKEN>          (Widget, Garmin)
 Authorization: Bearer <Access-Token>   (alternativ: angemeldete Web-App)
 ```
 
+`?view=compact` liefert für Widget und Garmin nur eine flache Liste (`plants`: Name, Raum, Status, Feuchte, Menge `ml`, nächstes Gießen `next`, wichtigster Hinweis `hint`; `rooms`: Luftfeuchte und Temperatur), höchstens 20 Pflanzen, siehe [`_shared/compact.ts`](supabase/functions/_shared/compact.ts).
+
 Liefert alle Räume mit Raumklima und Grundriss (`floor_plan`) und darin die Pflanzen, dringendste zuerst. Pro Pflanze:
 
 | Feld | Bedeutung |

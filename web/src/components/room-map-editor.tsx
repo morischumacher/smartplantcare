@@ -291,6 +291,12 @@ export function RoomMapEditor({
             {selectedPlant && (
               <PlantPanel
                 plant={selectedPlant}
+                standsOn={(() => {
+                  const pos = posOf(selectedPlant);
+                  return pos
+                    ? draft!.furniture.find((f) => f.height_m && pos.x >= f.x && pos.x <= f.x + f.w && pos.y >= f.y && pos.y <= f.y + f.h) ?? null
+                    : null;
+                })()}
                 height={posOf(selectedPlant)?.h ?? null}
                 onHeight={(h) => {
                   const pos = posOf(selectedPlant);
@@ -426,12 +432,14 @@ function HeightField({ value, onChange }: { value: number | null; onChange: (h: 
 
 function PlantPanel({
   plant,
+  standsOn,
   height,
   onHeight,
   onUnplace,
   onDelete,
 }: {
   plant: PlantSummary;
+  standsOn: FloorPlan["furniture"][number] | null;
   height: number | null;
   onHeight: (h: number | null) => void;
   onUnplace: () => void;
@@ -444,6 +452,11 @@ function PlantPanel({
         {plant.species && <span className="truncate text-xs text-stone-500 italic">{plant.species}</span>}
       </div>
       <HeightField value={height} onChange={onHeight} />
+      {standsOn?.height_m && height !== standsOn.height_m && (
+        <button type="button" className="btn-ghost w-full text-xs" onClick={() => onHeight(standsOn.height_m!)}>
+          Steht auf „{standsOn.label}“: {String(standsOn.height_m).replace(".", ",")} m übernehmen
+        </button>
+      )}
       <div className="flex flex-wrap gap-2">
         <button className="btn-ghost px-2.5 py-1 text-xs" onClick={onUnplace}>Von Karte nehmen</button>
         <span className="ml-auto">
@@ -549,6 +562,7 @@ function SelectedPanel({
         </label>
         {numInput(f.w, (w) => update({ w }), "Breite m")}
         {numInput(f.h, (h) => update({ h }), "Tiefe m")}
+        {numInput(f.height_m ?? 0, (height_m) => update({ height_m: height_m > 0 ? r2(Math.min(height_m, 3)) : null }), "Höhe m")}
         <button className="btn-danger" onClick={onRemove}>Entfernen</button>
       </div>
     );
