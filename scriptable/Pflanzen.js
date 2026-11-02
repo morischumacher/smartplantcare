@@ -2,7 +2,7 @@
 // These must be at the very top of the file. Do not edit.
 // icon-color: deep-green; icon-glyph: leaf;
 
-// Pflanzen-Widget für Scriptable (iPhone). Liest die kompakte Übersicht der Edge Function `summary`
+// Mo'sSmartPlantCare-Widget für Scriptable (iPhone). Liest die kompakte Übersicht der Edge Function `summary`
 // und zeigt, welche Pflanzen Wasser brauchen. Größen: klein, mittel, groß und Sperrbildschirm.
 //
 // Einrichtung: Skript in Scriptable einmal direkt starten – es fragt nach dem Read-Token
@@ -16,19 +16,20 @@ const CACHE_FILE = "plants-summary.json";
 const REFRESH_MIN = 15;
 
 const STATUS = {
-  water_now: { label: "Gießen", color: new Color("#e11d48"), symbol: "drop.fill" },
-  water_soon: { label: "Bald", color: new Color("#f59e0b"), symbol: "drop" },
-  no_data: { label: "Keine Daten", color: new Color("#a8a29e"), symbol: "wifi.slash" },
-  ok: { label: "Gut", color: new Color("#10b981"), symbol: "leaf.fill" },
+  water_now: { label: "Gießen", color: new Color("#c25637"), symbol: "drop.fill" },
+  water_soon: { label: "Bald", color: new Color("#d5a434"), symbol: "drop" },
+  no_data: { label: "Keine Daten", color: new Color("#a5a091"), symbol: "wifi.slash" },
+  ok: { label: "Gut", color: new Color("#348152"), symbol: "leaf.fill" },
 };
 const ALERT = {
-  critical: new Color("#e11d48"),
-  warning: new Color("#f59e0b"),
+  critical: new Color("#c25637"),
+  warning: new Color("#d5a434"),
   symbol: { humidity: "humidity.fill", temperature: "thermometer.medium" },
 };
-const TEXT = Color.dynamic(new Color("#1c1917"), new Color("#f5f5f4"));
-const MUTED = Color.dynamic(new Color("#78716c"), new Color("#a8a29e"));
-const BG = Color.dynamic(new Color("#f0fdf4"), new Color("#0c1a13"));
+const TEXT = Color.dynamic(new Color("#1f1e1a"), new Color("#f7f6f1"));
+const MUTED = Color.dynamic(new Color("#7a7568"), new Color("#a5a091"));
+// same palette as the web app ("Gewächshaus")
+const BG = Color.dynamic(new Color("#f7f6f1"), new Color("#141411"));
 
 // --- Setup -------------------------------------------------------------------
 
@@ -243,7 +244,7 @@ function build(family, { data, stale, error }) {
     w.setPadding(12, 14, 10, 14);
   }
   if (!data) {
-    text(w, "Pflanzen", 14, { bold: true, color: lock ? Color.white() : TEXT });
+    text(w, "Mo'sPlantCare", 14, { bold: true, color: lock ? Color.white() : TEXT });
     text(w, error ?? "Keine Daten", 11, { color: lock ? Color.white() : MUTED, lines: 4 });
     return w;
   }
@@ -258,7 +259,7 @@ function build(family, { data, stale, error }) {
 async function inApp() {
   if (!Keychain.contains(TOKEN_KEY)) await setup();
   const menu = new Alert();
-  menu.title = "Pflanzen-Widget";
+  menu.title = "Mo'sSmartPlantCare";
   for (const a of ["Vorschau klein", "Vorschau mittel", "Vorschau groß", "Token / Adresse ändern"]) menu.addAction(a);
   menu.addCancelAction("Fertig");
   const choice = await menu.presentSheet();
