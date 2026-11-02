@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { DeleteVacation, RoomForm, SensorForm, VacationForm } from "@/components/settings-forms";
+import { DeleteVacation, NotifyForm, RoomForm, SensorForm, VacationForm } from "@/components/settings-forms";
 import { Skeleton } from "@/components/ui";
-import { getRooms, getSensors, getVacations } from "@/lib/data";
+import { getNotifySettings, getRooms, getSensors, getVacations } from "@/lib/data";
 import { date, relTime } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Einstellungen" };
@@ -19,7 +19,7 @@ export default function SettingsPage() {
 }
 
 async function Settings() {
-  const [rooms, sensors, vacations] = await Promise.all([getRooms(), getSensors(), getVacations()]);
+  const [rooms, sensors, vacations, notify] = await Promise.all([getRooms(), getSensors(), getVacations(), getNotifySettings()]);
   const hygrometers = sensors.filter((s) => s.type === "hygrometer").map((s) => ({ id: s.id, name: s.name ?? s.mac }));
 
   return (
@@ -69,8 +69,21 @@ async function Settings() {
 
       <section className="space-y-3">
         <div>
+          <h2 className="text-lg font-semibold">Benachrichtigungen</h2>
+          <p className="text-sm text-stone-500">
+            Push über die App ntfy: dort dasselbe Topic abonnieren. Gemeldet wird, was jetzt gegossen werden muss, Raumklima, Gieß-Auffälligkeiten
+            und stumme Sensoren – neu Aufgetretenes sofort, Andauerndes einmal am Tag. In der Ruhezeit und im Urlaub kommt nur Kritisches.
+          </p>
+        </div>
+        <div className="card p-4">
+          {notify ? <NotifyForm settings={notify} /> : <p className="text-sm text-stone-500">Wird gerade eingerichtet – Datenbank noch nicht aktualisiert.</p>}
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <div>
           <h2 className="text-lg font-semibold">Urlaub</h2>
-          <p className="text-sm text-stone-500">In dieser Zeit fließt Gießen nicht ins Lernen ein (z. B. wenn jemand anderes gießt).</p>
+          <p className="text-sm text-stone-500">In dieser Zeit fließt Gießen nicht ins Lernen ein (z. B. wenn jemand anderes gießt) und es kommen nur kritische Benachrichtigungen.</p>
         </div>
         <div className="card space-y-4 p-4">
           {vacations.length > 0 && (

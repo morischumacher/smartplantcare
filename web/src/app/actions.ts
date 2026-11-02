@@ -461,6 +461,41 @@ export async function deleteVacation(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+// --- Notifications ---------------------------------------------------------
+
+const NTFY_SERVER = "https://ntfy.sh";
+const TOPIC = /^[A-Za-z0-9_-]{1,64}$/;
+
+export async function saveNotifySettings(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const topic = str(fd, "ntfy_topic");
+  if (topic && !TOPIC.test(topic)) return { ok: false, error: "Topic: nur Buchstaben, Ziffern, - und _ (max. 64 Zeichen)." };
+  const hour = (key: string) => {
+    const n = num(fd, key);
+    return n === null ? null : Math.min(23, Math.max(0, Math.round(n)));
+  };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("notify_settings")
+    .update({ ntfy_topic: topic, quiet_from: hour("quiet_from"), quiet_to: hour("quiet_to"), updated_at: new Date().toISOString() })
+    .eq("id", true);
+  if (error) return fail(error);
+  refresh();
+  return { ok: true, message: topic ? "Gespeichert" : "Gespeichert – Benachrichtigungen aus" };
+}
+
+export async function sendTestPush(topic: string): Promise<ActionResult> {
+  if (!TOPIC.test(topic)) return { ok: false, error: "Erst ein gültiges Topic eintragen." };
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) return { ok: false, error: "Nicht angemeldet" };
+  const res = await fetch(NTFY_SERVER, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ topic, title: "Pflanzen", message: "Test: Benachrichtigungen kommen an.", tags: ["seedling"] }),
+  });
+  return res.ok ? { ok: true, message: "Gesendet – kommt sie in der ntfy-App an?" } : { ok: false, error: `ntfy: HTTP ${res.status}` };
+}
+
 export async function setRoomScan(roomId: string, path: string | null): Promise<ActionResult> {
   const supabase = await createClient();
   const { data: room } = await supabase.from("rooms").select("scan_path").eq("id", roomId).single();

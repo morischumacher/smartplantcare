@@ -434,3 +434,7 @@ verify_jwt = true
 
 [functions.plant-species]
 verify_jwt = true
+
+# Called by pg_cron with a generated secret (x-cron-secret header, see migration *_notifications).
+[functions.notify]
+verify_jwt = false

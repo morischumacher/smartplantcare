@@ -22,7 +22,7 @@ Govee H5075 ─────────────┼─ BLE ─▶ Atom Lite /
                               Edge Function `summary` (read-only, Read-Token) ◀──┤
                                  │                                           │
                  Scriptable-Widget, Garmin-Glance          Web-App (PWA, Supabase Auth)
-                                                           ntfy-Push über `notify` (cron)
+                                                           ntfy-Push über `notify` (pg_cron, 15 Min.)
 ```
 
 - Supabase (Free Tier) ist die einzige Datenquelle, kein Homeserver.
@@ -82,6 +82,6 @@ npm run build && npm run lint && npm test   # test: IFC-Umrechnung (src/lib/*.te
 - [ ] Schritt 2: ESPHome auf dem Atom Lite – Firmware fertig und kompiliert, Test mit echter Hardware steht aus
 - [x] Schritt 3: `summary` + Gieß-Logik (Lernen, Umtopfen, Gießen erkennen), Foto-Tagebuch + KI-Check (`analyze-photo`)
 - [x] Schritt 4: Web-App – live auf https://smartplantcare-umber.vercel.app (Vercel-Projekt `smartplantcare`, Root `web`, Deploy bei Push auf `main`)
-- [ ] Schritt 5: ntfy
+- [x] Schritt 5: ntfy – `notify` per pg_cron alle 15 Min., Topic und Ruhezeit in der Web-App (Einstellungen)
 - [x] Schritt 6: Scriptable – Widget läuft auf dem iPhone (`node --test scriptable/test/`)
 - [x] Schritt 7: Garmin – läuft auf der Forerunner 165 Music als private Beta-App im Connect IQ Store (USB-Sideload per OpenMTP klappt am Mac nicht; neue Versionen als `.iq` exportieren und dort hochladen, siehe `garmin/README.md`)

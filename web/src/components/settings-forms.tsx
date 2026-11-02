@@ -1,8 +1,8 @@
 "use client";
 
 import { ConfirmButton } from "@/components/confirm-button";
-import { useActionState, useTransition } from "react";
-import { addVacation, deleteRoom, deleteSensor, deleteVacation, saveRoom, saveSensor } from "@/app/actions";
+import { useActionState, useState, useTransition } from "react";
+import { addVacation, deleteRoom, deleteSensor, deleteVacation, saveNotifySettings, saveRoom, saveSensor, sendTestPush, type ActionResult } from "@/app/actions";
 import { FormStatus } from "@/components/form-status";
 
 type Option = { id: string; name: string };
@@ -109,5 +109,43 @@ export function DeleteVacation({ id }: { id: string }) {
     <button className="text-xs text-stone-400 hover:text-rose-600" disabled={pending} onClick={() => start(async () => void (await deleteVacation(id)))}>
       Löschen
     </button>
+  );
+}
+
+/** Random, hard-to-guess topic: anyone who knows the topic can read the notifications. */
+function newTopic() {
+  return `pflanzen-${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
+}
+
+export function NotifyForm({ settings }: { settings: { ntfy_topic: string | null; quiet_from: number | null; quiet_to: number | null } }) {
+  const [state, action, pending] = useActionState(saveNotifySettings, null);
+  const [topic, setTopic] = useState(settings.ntfy_topic ?? "");
+  const [test, setTest] = useState<ActionResult | null>(null);
+  const [testing, start] = useTransition();
+  return (
+    <form action={action} className="space-y-3">
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="min-w-56 flex-1">
+          <span className="label">ntfy-Topic</span>
+          <input className="input font-mono" name="ntfy_topic" value={topic} onChange={(e) => setTopic(e.target.value.trim())} placeholder="leer = aus" />
+        </label>
+        {!topic && <button type="button" className="btn-ghost" onClick={() => setTopic(newTopic())}>Topic erzeugen</button>}
+        <button
+          type="button"
+          className="btn-ghost"
+          disabled={testing || !topic}
+          onClick={() => start(async () => setTest(await sendTestPush(topic)))}
+        >
+          {testing ? "Sende…" : "Test senden"}
+        </button>
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="w-28"><span className="label">Ruhe ab (Uhr)</span><input className="input" name="quiet_from" type="number" min="0" max="23" defaultValue={settings.quiet_from ?? ""} /></label>
+        <label className="w-28"><span className="label">bis (Uhr)</span><input className="input" name="quiet_to" type="number" min="0" max="23" defaultValue={settings.quiet_to ?? ""} /></label>
+        <button className="btn" disabled={pending}>Speichern</button>
+        <FormStatus state={state} />
+      </div>
+      {test && <FormStatus state={test} />}
+    </form>
   );
 }

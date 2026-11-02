@@ -119,6 +119,13 @@ export async function getSensors() {
   return data;
 }
 
+/** null while the notifications migration is not deployed yet */
+export async function getNotifySettings() {
+  const supabase = await createClient();
+  const { data } = await supabase.from("notify_settings").select("ntfy_topic, quiet_from, quiet_to").maybeSingle();
+  return data as { ntfy_topic: string | null; quiet_from: number | null; quiet_to: number | null } | null;
+}
+
 export async function getVacations() {
   const supabase = await createClient();
   const { data, error } = await supabase

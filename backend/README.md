@@ -122,6 +122,21 @@ Authorization: Bearer <Access-Token>
 
 Namen werden über [`_shared/species.ts`](supabase/functions/_shared/species.ts) zugeordnet (wissenschaftlich, deutsch, Synonyme wie „Calathea“ oder „Sansevieria“, Sorten in Anführungszeichen werden ignoriert). Eine neue Art legt `identify` nur an, wenn Claude sich mindestens mittel sicher ist. Beim Anlegen einer Pflanze werden Feuchte-, Licht- und Temperaturbereich der Art als Zielwerte übernommen.
 
+## Benachrichtigungen (`notify`)
+
+`pg_cron` ruft alle 15 Minuten `notify` auf (Header `x-cron-secret`; das Secret erzeugt die Migration selbst in `internal_secrets`, nichts von Hand zu setzen). `notify` holt die volle `summary`, sammelt Ereignisse und schickt sie per [ntfy](https://ntfy.sh) an das Topic aus `notify_settings`:
+
+| Ereignis | Schlüssel | Priorität |
+| --- | --- | --- |
+| Pflanze jetzt gießen („Monstera: 18 % – bitte ca. 250 ml gießen“) | `water:<plant>` | 4 |
+| Gieß-Auffälligkeit (`stays_wet`, `dries_fast`, `no_recovery`) | `hint:<plant>:<code>` | 3 |
+| Raumklima (Luftfeuchte, Temperatur) | `climate:<room>:<kind>` | 4, kritisch 5 |
+| Zugeordneter Sensor seit 6 Std. stumm | `sensor:<id>` | 3 |
+
+Neue Ereignisse gehen sofort raus, andauernde einmal am Tag (`notification_state`). Verschwindet ein Ereignis und kommt innerhalb von 12 Std. wieder (Feuchte pendelt an der Grenze), wird es nicht erneut geschickt. In der Ruhezeit (`quiet_from`–`quiet_to`, Berliner Zeit) und im Urlaub wird nur Kritisches geschickt; Zurückgehaltenes kommt danach. Topic und Ruhezeit stellt man in der Web-App unter Einstellungen ein. Auf der Garmin erscheinen die Pushs als normale Handy-Benachrichtigungen.
+
+Hinweis: Der Cron-Job ruft immer die produktive URL auf; in einer lokalen Supabase scheitert er mit 401.
+
 ## Secrets
 
 Unter **Edge Functions → Secrets** setzen:
