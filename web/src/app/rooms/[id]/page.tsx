@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { MapLegend } from "@/components/floor-plan";
+import { CandidateList } from "@/components/candidates";
 import { RoomMapEditor } from "@/components/room-map-editor";
 import { Skeleton } from "@/components/ui";
-import { getRoom, getSummary, signedUrls } from "@/lib/data";
+import { getCandidates, getRoom, getSpeciesList, getSummary, signedUrls } from "@/lib/data";
 import { num } from "@/lib/format";
 import type { FloorPlan } from "@/lib/types";
 
@@ -18,12 +19,12 @@ export default function RoomPage({ params }: PageProps<"/rooms/[id]">) {
 
 async function Room({ params }: Pick<PageProps<"/rooms/[id]">, "params">) {
   const { id } = await params;
-  const [room, summary] = await Promise.all([getRoom(id), getSummary()]);
+  const [room, summary, candidates, species] = await Promise.all([getRoom(id), getSummary(), getCandidates(id), getSpeciesList()]);
   if (!room) notFound();
   const plants = summary.rooms.find((r) => r.id === id)?.plants ?? [];
   const climate = summary.rooms.find((r) => r.id === id)?.climate;
   const paths = (room.photo_paths as string[]) ?? [];
-  const urls = await signedUrls(paths);
+  const urls = await signedUrls(room.scan_path ? [...paths, room.scan_path] : paths);
 
   return (
     <div className="space-y-5">
@@ -41,8 +42,11 @@ async function Room({ params }: Pick<PageProps<"/rooms/[id]">, "params">) {
         plan={room.floor_plan as FloorPlan | null}
         plants={plants}
         photos={paths.map((p) => ({ path: p, url: urls.get(p) ?? null }))}
+        candidates={candidates}
+        scan={room.scan_path ? { path: room.scan_path, url: urls.get(room.scan_path) ?? null } : null}
       />
       <MapLegend />
+      <CandidateList candidates={candidates} species={species} />
     </div>
   );
 }

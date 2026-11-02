@@ -18,6 +18,8 @@ const PAD = 0.45; // metres of margin around the room
 type Props = {
   plan: FloorPlan;
   plants: PlantSummary[];
+  /** Detected plants not set up yet, drawn as dashed pins. */
+  candidates?: { id: string; x: number; y: number; label: string }[];
   /** Overrides plant.map while editing. */
   positions?: Record<string, Pos | null>;
   editable?: boolean;
@@ -68,6 +70,7 @@ function nearby(pos: Pos, plan: FloorPlan) {
 export function FloorPlanMap({
   plan,
   plants,
+  candidates = [],
   positions,
   editable = false,
   compact = false,
@@ -176,7 +179,7 @@ export function FloorPlanMap({
                 width={f.w}
                 height={f.h}
                 rx={Math.min(0.1, f.w / 4, f.h / 4)}
-                className={`fill-stone-200/90 dark:fill-stone-700/70 ${isSel ? "stroke-emerald-500" : "stroke-stone-300 dark:stroke-stone-600"}`}
+                className={`fill-stone-300/70 dark:fill-stone-600/70 ${isSel ? "stroke-emerald-500" : "stroke-stone-300 dark:stroke-stone-600"}`}
                 strokeWidth={isSel ? 0.05 : 0.015}
               />
               {!compact && (
@@ -271,6 +274,27 @@ export function FloorPlanMap({
             </g>
           );
         })}
+
+        {/* detected, not yet set up */}
+        {candidates.map((c) => (
+          <g key={c.id} transform={`translate(${c.x} ${c.y})`} className="pointer-events-none">
+            <circle r={0.17} className="fill-white/80 stroke-violet-500 dark:fill-stone-900/80" strokeWidth="0.03" strokeDasharray="0.06 0.04" />
+            <text fontSize={0.2} textAnchor="middle" dominantBaseline="central" className="fill-violet-600 font-semibold dark:fill-violet-300">?</text>
+            {!compact && (
+              <text
+                y={0.17 + fontSize * 0.95}
+                fontSize={fontSize * 0.85}
+                textAnchor="middle"
+                className="fill-violet-700 dark:fill-violet-300"
+                style={{ paintOrder: "stroke" }}
+                stroke="var(--halo-text, #ecfdf5)"
+                strokeWidth={fontSize * 0.25}
+              >
+                {c.label}
+              </text>
+            )}
+          </g>
+        ))}
 
         {/* plants */}
         {placed.map(({ plant, pos }) => {

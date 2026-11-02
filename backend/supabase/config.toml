@@ -431,3 +431,6 @@ verify_jwt = true
 # Called by the signed-in web app user; the function additionally rejects the anon key.
 [functions.plan-room]
 verify_jwt = true
+
+[functions.plant-species]
+verify_jwt = true

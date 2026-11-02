@@ -6,13 +6,15 @@ Postgres-Schema und Edge Functions. Die Supabase-CLI läuft über `npx`, eine gl
 
 | Tabelle | Inhalt |
 | --- | --- |
-| `rooms` | Raum mit Zielbereich Luftfeuchte, Raumfotos (`photo_paths`) und abstraktem Grundriss (`floor_plan`) |
+| `rooms` | Raum mit Zielbereich Luftfeuchte, Raumfotos (`photo_paths`), optionalem LiDAR-Scan (`scan_path`) und abstraktem Grundriss (`floor_plan`) |
 | `sensors` | BLE-Sensor (MAC, Typ `flower_care` / `hygrometer`, Raum, zuletzt gesehen, Batterie, RSSI) |
-| `plants` | Pflanze mit Art, Raum, Zielbereichen (Feuchte, Licht, Temperatur, Leitfähigkeit), Foto-Intervall und Position auf der Raumkarte (`map_x`, `map_y` in m) |
+| `plants` | Pflanze mit Art (`species_id` plus freie Bezeichnung), Raum, Zielbereichen (Feuchte, Licht, Temperatur, Leitfähigkeit), Foto-Intervall und Position auf der Raumkarte (`map_x`, `map_y` in m) |
 | `pots` | Topf-Perioden: Volumen, Maße, Erdart, seit wann. Umtopfen = neue Zeile |
 | `plant_sensors` | Zuordnung Pflanze ↔ Sensor(en), mehrere Sensoren pro Topf möglich |
 | `readings` | Rohmesswerte pro Sensor |
 | `waterings` | Gießvorgänge (ml, Urlaub ja/nein, Quelle `manual` oder `detected`) |
+| `species` | Pflanzenarten mit Pflegeprofil (Feuchte, Licht, Temperatur, Luftfeuchte, Dünger, Winterruhe, Erde, Giftigkeit), Beispielbild von Wikimedia Commons mit Urheber und Lizenz. Quelle `curated` (Basisliste, 61 Arten), `ai` oder `manual` |
+| `plant_candidates` | Auf Raumfotos entdeckte, noch nicht angelegte Pflanzen: Ausschnitt im Foto, Artvermutung, Sicherheit, Position, Nahaufnahme; Status `open`/`accepted`/`dismissed` |
 | `plant_photos` | Pflanzentagebuch: Foto im Bucket `plant-photos`, Anlass, KI-Auswertung (`analysis`) |
 | `vacations` | Urlaubszeiträume |
 | `sensor_latest` (View) | jeweils letzter Messwert pro Sensor |
@@ -90,9 +92,30 @@ Authorization: Bearer <Access-Token des angemeldeten Nutzers>
 { "room_id": "<rooms.id>" }
 ```
 
-Aus 1–4 Raumfotos (`rooms.photo_paths`, im Bucket unter `rooms/<room_id>/`) und dem letzten Tagebuchfoto jeder Pflanze im Raum zeichnet Claude einen abstrakten Grundriss von oben: Umriss, Fenster, Türen, Heizkörper, große Möbel und die Standorte der Pflanzen, alles in Metern. Die Funktion speichert nichts – die Web-App zeigt den Vorschlag, man korrigiert ihn (Pflanzen und Möbel verschieben, Elemente entfernen) und speichert dann `rooms.floor_plan` und `plants.map_x/map_y`. Format von `floor_plan`: siehe Kommentar in der Migration `20261102150000_room_map.sql`.
+Claude zeichnet einen abstrakten Grundriss von oben (Umriss, Fenster, Türen, Heizkörper, große Möbel, alles in Metern) und verortet die Pflanzen. Eingaben:
 
-Kosten: grob 5–10 Cent pro Grundriss.
+| Quelle | liefert |
+| --- | --- |
+| iPhone-Scan (`rooms.scan_path`, optional): Grundriss aus einer LiDAR-App wie ezSpace, Polycam oder magicplan als PDF, Bild oder Screenshot | exakte Maße, Wände, Fenster, Türen |
+| Raumfotos (`rooms.photo_paths`, 1–4) | Heizkörper (erkennt RoomPlan nicht), Pflanzen, Möbel; ohne Scan auch die geschätzte Geometrie |
+| letztes Tagebuchfoto jeder Pflanze im Raum | Wiedererkennen der angelegten Pflanzen |
+| Artenliste aus `species` | Artvermutung für neue Pflanzen |
+
+Antwort: `floor_plan`, Positionen der angelegten Pflanzen und `candidates` – neu entdeckte Pflanzen mit Artvermutung, Sicherheit, Position und Ausschnitt im Foto. Die Funktion speichert nichts; die Web-App zeigt den Vorschlag, und beim Speichern landen Grundriss, Positionen und Kandidaten in der Datenbank. Kandidaten bestätigt man einzeln (Name/Art korrigieren), lässt unsichere per Nahaufnahme bestimmen oder verwirft sie.
+
+Kosten: grob 5–15 Cent pro Grundriss.
+
+## Pflanzenarten (`plant-species`)
+
+```
+POST /functions/v1/plant-species
+Authorization: Bearer <Access-Token>
+{ "action": "identify", "photo_path": "…" }   → Art aus einer Nahaufnahme bestimmen
+{ "action": "ensure", "name": "Alocasia zebrina" } → vorhandene Art oder neues KI-Profil
+{ "action": "images", "limit": 10 }            → Beispielbilder von Wikimedia Commons nachladen
+```
+
+Namen werden über [`_shared/species.ts`](supabase/functions/_shared/species.ts) zugeordnet (wissenschaftlich, deutsch, Synonyme wie „Calathea“ oder „Sansevieria“, Sorten in Anführungszeichen werden ignoriert). Eine neue Art legt `identify` nur an, wenn Claude sich mindestens mittel sicher ist. Beim Anlegen einer Pflanze werden Feuchte-, Licht- und Temperaturbereich der Art als Zielwerte übernommen.
 
 ## Secrets
 

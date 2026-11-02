@@ -1,8 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Link from "next/link";
-import { signOut } from "./actions";
-import { LeafIcon } from "@/components/icons";
+import { Suspense } from "react";
+import { Nav, NavFallback } from "@/components/nav";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -26,23 +25,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="de" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
         <header className="sticky top-0 z-30 border-b border-stone-200/70 bg-stone-50/80 backdrop-blur dark:border-stone-800/70 dark:bg-stone-950/80">
-          <nav className="mx-auto flex max-w-5xl items-center gap-1 px-4 py-3 text-sm">
-            <Link href="/" className="mr-3 flex items-center gap-2 font-semibold">
-              <LeafIcon className="size-5 text-emerald-600" />
-              Pflanzen
-            </Link>
-            <Link href="/" className="rounded-lg px-2.5 py-1.5 hover:bg-stone-200/60 dark:hover:bg-stone-800">
-              Übersicht
-            </Link>
-            <Link href="/settings" className="rounded-lg px-2.5 py-1.5 hover:bg-stone-200/60 dark:hover:bg-stone-800">
-              Einstellungen
-            </Link>
-            <form action={signOut} className="ml-auto">
-              <button className="rounded-lg px-2.5 py-1.5 text-stone-500 hover:bg-stone-200/60 dark:hover:bg-stone-800">
-                Abmelden
-              </button>
-            </form>
-          </nav>
+          <Suspense fallback={<NavFallback />}>
+            <Nav />
+          </Suspense>
         </header>
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
       </body>

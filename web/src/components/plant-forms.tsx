@@ -1,9 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
+import Link from "next/link";
+import { useActionState, useRef, useState } from "react";
 import { repot, savePlant } from "@/app/actions";
 import { FormStatus } from "@/components/form-status";
+import { SpeciesImage, SpeciesSelect } from "@/components/species-ui";
 import { SOIL_TYPES } from "@/lib/format";
+import type { Species } from "@/lib/types";
 
 type Plant = {
   id: string;
@@ -18,8 +21,12 @@ type Plant = {
   temp_max_c: number | null;
   photo_interval_days: number;
   notes: string | null;
+  species_id: string | null;
   sensor_ids: string[];
 };
+
+/** Species values that become the plant's targets. */
+const TARGET_FIELDS = ["moisture_min", "moisture_max", "light_min_lux", "light_max_lux", "temp_min_c", "temp_max_c"] as const;
 
 type Option = { id: string; name: string };
 
@@ -47,14 +54,53 @@ function PotFields() {
   );
 }
 
-export function PlantForm({ plant, rooms, sensors }: { plant?: Plant; rooms: Option[]; sensors: (Option & { taken_by: string | null })[] }) {
+export function PlantForm({
+  plant,
+  rooms,
+  sensors,
+  species,
+}: {
+  plant?: Plant;
+  rooms: Option[];
+  sensors: (Option & { taken_by: string | null })[];
+  species: Species[];
+}) {
   const [state, action, pending] = useActionState(savePlant, null);
+  const form = useRef<HTMLFormElement>(null);
+  const [speciesId, setSpeciesId] = useState(plant?.species_id ?? null);
+  const picked = species.find((s) => s.id === speciesId) ?? null;
+
+  function apply(sp: Species) {
+    const el = form.current!.elements as unknown as Record<string, HTMLInputElement | HTMLSelectElement | undefined>;
+    for (const f of TARGET_FIELDS) if (el[f]) el[f]!.value = sp[f] === null ? "" : String(sp[f]);
+    if (el.species) el.species.value = sp.common_name_de;
+    if (el.soil_type) el.soil_type.value = sp.soil_type;
+  }
+
   return (
-    <form action={action} className="space-y-5">
+    <form ref={form} action={action} className="space-y-5">
       {plant && <input type="hidden" name="id" value={plant.id} />}
+      <div className="flex gap-3 rounded-xl bg-stone-50 p-3 dark:bg-stone-800/40">
+        {picked && <SpeciesImage species={picked} className="size-16 shrink-0 rounded-lg" />}
+        <div className="flex-1 space-y-1.5">
+          <span className="label">Pflanzenart</span>
+          <SpeciesSelect
+            species={species}
+            name="species_id"
+            value={speciesId}
+            onChange={(sp) => {
+              setSpeciesId(sp?.id ?? null);
+              if (sp && (!plant || confirm(`Zielwerte von „${sp.common_name_de}“ übernehmen?`))) apply(sp);
+            }}
+          />
+          <p className="text-xs text-stone-500">
+            Übernimmt Feuchte, Licht und Temperatur als Startwerte. Art fehlt? Unter <Link className="underline" href="/species">Arten</Link> von der KI anlegen lassen.
+          </p>
+        </div>
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Name"><input className="input" name="name" defaultValue={plant?.name} required placeholder="z. B. Monstera Wohnzimmer" /></Field>
-        <Field label="Art"><input className="input" name="species" defaultValue={plant?.species ?? ""} placeholder="z. B. Monstera deliciosa" /></Field>
+        <Field label="Bezeichnung (frei)"><input className="input" name="species" defaultValue={plant?.species ?? ""} placeholder="z. B. Monstera deliciosa" /></Field>
         <Field label="Raum">
           <select className="input" name="room_id" defaultValue={plant?.room_id ?? ""}>
             <option value="">– kein Raum –</option>

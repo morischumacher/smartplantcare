@@ -29,6 +29,7 @@ Govee H5075 ─────────────┼─ BLE ─▶ Atom Lite /
 - Clients mit wenig Logik (Scriptable, Garmin) lesen nur `summary`.
 - Die gesamte Fachlogik (Gieß-Empfehlung, Hinweise, Winterruhe) lebt im Backend, nicht in den Clients. Reine Logik liegt in `backend/supabase/functions/_shared/` ohne Deno-/Supabase-Imports, damit sie mit `node --test` testbar ist.
 - Umtopfen = neue Zeile in `pots`; Lernen nutzt nur Daten der aktuellen Topf-Periode, die vorherige dient (skaliert) als Startwert.
+- Pflanzenarten (`species`) liefern Startwerte für neue Pflanzen; die Werte der Pflanze selbst bleiben maßgeblich und werden durch Lernen angepasst.
 - KI-Funktionen nutzen Claude über `@anthropic-ai/sdk` (Modell `claude-opus-5-5`, `fallbacks: "default"`).
 
 ## Ordnerstruktur
@@ -80,7 +81,7 @@ npm run build && npm run lint
 - [x] Schritt 1: Schema + `ingest`
 - [ ] Schritt 2: ESPHome auf dem Atom Lite – Firmware fertig und kompiliert, Test mit echter Hardware steht aus
 - [x] Schritt 3: `summary` + Gieß-Logik (Lernen, Umtopfen, Gießen erkennen), Foto-Tagebuch + KI-Check (`analyze-photo`)
-- [ ] Schritt 4: Web-App – gebaut (Übersicht, Pflanze, Tagebuch, Raumkarte, Einstellungen), Deploy auf Vercel steht aus
+- [ ] Schritt 4: Web-App – gebaut (Übersicht, Pflanze, Tagebuch, Raumkarte mit KI-Grundriss, LiDAR-Scan und Pflanzenerkennung, Artendatenbank, Einstellungen), Deploy auf Vercel steht aus
 - [ ] Schritt 5: ntfy
 - [ ] Schritt 6: Scriptable
 - [ ] Schritt 7: Garmin

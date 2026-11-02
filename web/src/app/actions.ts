@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { callFunction, createClient } from "@/lib/supabase/server";
-import type { FloorPlan } from "@/lib/types";
+import type { CandidateSuggestion, FloorPlan, Species } from "@/lib/types";
 
 // Server Actions: every write goes through here and runs as the signed-in user (RLS applies).
 
@@ -98,6 +98,7 @@ export async function savePlant(_prev: ActionResult | null, fd: FormData): Promi
   const fields = {
     name: str(fd, "name"),
     species: str(fd, "species"),
+    species_id: str(fd, "species_id"),
     room_id: str(fd, "room_id"),
     moisture_min: num(fd, "moisture_min") ?? 20,
     moisture_max: num(fd, "moisture_max") ?? 50,
@@ -275,6 +276,7 @@ export async function setRoomPhotos(roomId: string, paths: string[]): Promise<Ac
 export type PlanSuggestion = {
   floor_plan: FloorPlan;
   plants: { plant_id: string; x: number; y: number; confidence: string }[];
+  candidates: CandidateSuggestion[];
 };
 
 export async function suggestFloorPlan(roomId: string): Promise<{ ok: true; suggestion: PlanSuggestion } | { ok: false; error: string }> {
@@ -289,6 +291,8 @@ export async function saveFloorPlan(input: {
   roomId: string;
   floorPlan: FloorPlan;
   positions: { plantId: string; x: number | null; y: number | null }[];
+  /** Plants the AI spotted that are not set up yet; replaces the room's open candidates. */
+  candidates?: CandidateSuggestion[];
 }): Promise<ActionResult> {
   try {
     const supabase = await createClient();
@@ -297,6 +301,25 @@ export async function saveFloorPlan(input: {
     for (const p of input.positions) {
       const { error: posError } = await supabase.from("plants").update({ map_x: p.x, map_y: p.y }).eq("id", p.plantId);
       if (posError) throw posError;
+    }
+    if (input.candidates) {
+      await supabase.from("plant_candidates").delete().eq("room_id", input.roomId).eq("status", "open");
+      if (input.candidates.length > 0) {
+        const { error: candError } = await supabase.from("plant_candidates").insert(
+          input.candidates.map((c) => ({
+            room_id: input.roomId,
+            photo_path: c.photo_path,
+            box: c.box,
+            description: c.description,
+            species_guess: c.species_guess,
+            species_id: c.species_id,
+            confidence: c.confidence,
+            map_x: c.map_x,
+            map_y: c.map_y,
+          })),
+        );
+        if (candError) throw candError;
+      }
     }
   } catch (e) {
     return fail(e);
@@ -342,4 +365,150 @@ export async function deleteVacation(id: string): Promise<ActionResult> {
   if (error) return fail(error);
   refresh();
   return { ok: true };
+}
+
+export async function setRoomScan(roomId: string, path: string | null): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data: room } = await supabase.from("rooms").select("scan_path").eq("id", roomId).single();
+  if (room?.scan_path && room.scan_path !== path) await supabase.storage.from("plant-photos").remove([room.scan_path]);
+  const { error } = await supabase.from("rooms").update({ scan_path: path }).eq("id", roomId);
+  if (error) return fail(error);
+  refresh();
+  return { ok: true };
+}
+
+// --- Species & detected plants ---------------------------------------------
+
+/** Existing species matching `name`, or a new profile written by Claude. */
+export async function ensureSpecies(name: string): Promise<{ ok: true; species: Species } | { ok: false; error: string }> {
+  try {
+    const { species } = await callFunction<{ species: Species }>("plant-species", { body: { action: "ensure", name } });
+    refresh();
+    return { ok: true, species };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Fehler" };
+  }
+}
+
+export async function loadSpeciesImages(): Promise<ActionResult> {
+  try {
+    const r = await callFunction<{ checked: number; found: number }>("plant-species", { body: { action: "images", limit: 30 } });
+    refresh();
+    return { ok: true, message: `${r.found} von ${r.checked} Bildern gefunden` };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function saveSpecies(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const id = str(fd, "id");
+  if (!id) return { ok: false, error: "Art fehlt." };
+  const fields = {
+    common_name_de: str(fd, "common_name_de"),
+    moisture_min: num(fd, "moisture_min"),
+    moisture_max: num(fd, "moisture_max"),
+    light_min_lux: num(fd, "light_min_lux"),
+    light_max_lux: num(fd, "light_max_lux"),
+    temp_min_c: num(fd, "temp_min_c"),
+    temp_max_c: num(fd, "temp_max_c"),
+    humidity_min: num(fd, "humidity_min"),
+    humidity_max: num(fd, "humidity_max"),
+    conductivity_min: num(fd, "conductivity_min"),
+    conductivity_max: num(fd, "conductivity_max"),
+    winter_rest: fd.get("winter_rest") === "on",
+    winter_moisture_min: num(fd, "winter_moisture_min"),
+    fertilize_every_days: num(fd, "fertilize_every_days"),
+    care_notes: str(fd, "care_notes"),
+  };
+  if (!fields.common_name_de || fields.moisture_min === null || fields.moisture_max === null) {
+    return { ok: false, error: "Name und Feuchtebereich sind Pflicht." };
+  }
+  if (fields.moisture_min >= fields.moisture_max) return { ok: false, error: "Feuchte: Minimum muss kleiner als Maximum sein." };
+  const supabase = await createClient();
+  const { error } = await supabase.from("species").update(fields).eq("id", id);
+  if (error) return fail(error);
+  refresh();
+  return { ok: true, message: "Gespeichert" };
+}
+
+/** Takes a close-up of a detected plant and lets Claude identify the species. */
+export async function identifyCandidate(candidateId: string, closeupPath: string): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    await supabase.from("plant_candidates").update({ closeup_path: closeupPath }).eq("id", candidateId);
+    const r = await callFunction<{
+      guess: string | null;
+      common_name_de?: string;
+      confidence: "high" | "medium" | "low";
+      reasoning: string;
+      species: Species | null;
+    }>("plant-species", { body: { action: "identify", photo_path: closeupPath } });
+    const { error } = await supabase
+      .from("plant_candidates")
+      .update({ species_guess: r.guess, species_id: r.species?.id ?? null, confidence: r.confidence })
+      .eq("id", candidateId);
+    if (error) throw error;
+    refresh();
+    if (!r.guess) return { ok: true, message: "Auf dem Foto ist keine Pflanze zu erkennen." };
+    return { ok: true, message: `${r.species?.common_name_de ?? r.common_name_de ?? r.guess} (${r.reasoning})` };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Creates a plant from a detected candidate, with the species' care values as targets. */
+export async function acceptCandidate(input: { candidateId: string; name: string; speciesId: string | null }): Promise<ActionResult> {
+  if (!input.name.trim()) return { ok: false, error: "Bitte einen Namen eingeben." };
+  try {
+    const supabase = await createClient();
+    const { data: c, error: cError } = await supabase.from("plant_candidates").select("*").eq("id", input.candidateId).single();
+    if (cError) throw cError;
+    const sp = input.speciesId
+      ? ((await supabase.from("species").select("*").eq("id", input.speciesId).single()).data as Species | null)
+      : null;
+    const { data: plant, error } = await supabase
+      .from("plants")
+      .insert({
+        name: input.name.trim(),
+        species: sp?.common_name_de ?? c.species_guess,
+        species_id: sp?.id ?? null,
+        room_id: c.room_id,
+        map_x: c.map_x,
+        map_y: c.map_y,
+        ...(sp ? speciesTargets(sp) : {}),
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    await supabase.from("pots").insert({ plant_id: plant.id, soil_type: sp?.soil_type ?? "universal" });
+    if (c.closeup_path) {
+      await supabase.from("plant_photos").insert({ plant_id: plant.id, storage_path: c.closeup_path, reason: "manual" });
+    }
+    await supabase.from("plant_candidates").update({ status: "accepted", plant_id: plant.id }).eq("id", c.id);
+  } catch (e) {
+    return fail(e);
+  }
+  refresh();
+  return { ok: true, message: "Pflanze angelegt" };
+}
+
+export async function dismissCandidate(id: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("plant_candidates").update({ status: "dismissed" }).eq("id", id);
+  if (error) return fail(error);
+  refresh();
+  return { ok: true };
+}
+
+function speciesTargets(sp: Species) {
+  return {
+    moisture_min: sp.moisture_min,
+    moisture_max: sp.moisture_max,
+    light_min_lux: sp.light_min_lux,
+    light_max_lux: sp.light_max_lux,
+    temp_min_c: sp.temp_min_c,
+    temp_max_c: sp.temp_max_c,
+    conductivity_min: sp.conductivity_min,
+    conductivity_max: sp.conductivity_max,
+  };
 }

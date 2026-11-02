@@ -73,3 +73,60 @@ export interface HourPoint {
   light: number | null;
   conductivity: number | null;
 }
+
+export interface Species {
+  id: string;
+  scientific_name: string;
+  common_name_de: string;
+  aliases: string[];
+  moisture_min: number;
+  moisture_max: number;
+  light_min_lux: number | null;
+  light_max_lux: number | null;
+  temp_min_c: number | null;
+  temp_max_c: number | null;
+  humidity_min: number | null;
+  humidity_max: number | null;
+  conductivity_min: number | null;
+  conductivity_max: number | null;
+  winter_rest: boolean;
+  winter_moisture_min: number | null;
+  fertilize_every_days: number | null;
+  soil_type: string;
+  toxic_to_pets: boolean | null;
+  care_notes: string | null;
+  image_url: string | null;
+  image_author: string | null;
+  image_license: string | null;
+  image_source_url: string | null;
+  image_checked_at: string | null;
+  source: "curated" | "ai" | "manual";
+}
+
+export type Box = { x: number; y: number; w: number; h: number };
+
+/** A plant spotted on room photos that is not set up yet. */
+export interface Candidate {
+  id: string;
+  description: string | null;
+  species_guess: string | null;
+  species_id: string | null;
+  confidence: "high" | "medium" | "low";
+  map_x: number | null;
+  map_y: number | null;
+  box: Box | null;
+  photo_url: string | null;
+  closeup_url: string | null;
+}
+
+export interface CandidateSuggestion {
+  description: string;
+  species_guess: string;
+  common_name_de: string;
+  species_id: string | null;
+  confidence: "high" | "medium" | "low";
+  map_x: number;
+  map_y: number;
+  photo_path: string;
+  box: Box;
+}

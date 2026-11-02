@@ -6,7 +6,8 @@ import { CameraIcon, DropIcon, SunIcon, ThermoIcon } from "@/components/icons";
 import { PhotoTimeline, PhotoUpload } from "@/components/photos";
 import { MoistureBar, Skeleton, StatusPill } from "@/components/ui";
 import { PendingWaterings, WateringForm, WateringHistory } from "@/components/watering";
-import { getHourly, getPhotos, getPlant, getSummary, getWaterings } from "@/lib/data";
+import { getHourly, getPhotos, getPlant, getSpecies, getSummary, getWaterings } from "@/lib/data";
+import { ImageCredit, SpeciesImage } from "@/components/species-ui";
 import { SOIL_TYPES, date, lightCategory, num, relTime } from "@/lib/format";
 
 export default function PlantPage({ params, searchParams }: PageProps<"/plants/[id]">) {
@@ -39,6 +40,7 @@ async function Plant({ params, searchParams }: Pick<PageProps<"/plants/[id]">, "
   const s = room?.plants.find((p) => p.id === id);
   if (!plant || !s) notFound();
   const pot = plant.pots[0];
+  const species = plant.species_id ? await getSpecies(plant.species_id) : null;
   const light = lightCategory(s.light_peak_7d);
   const now = new Date(summary.generated_at).getTime();
   const since = now - days * 86_400_000;
@@ -125,6 +127,27 @@ async function Plant({ params, searchParams }: Pick<PageProps<"/plants/[id]">, "
                   {h.message}
                 </div>
               ))}
+            </section>
+          )}
+
+          {species && (
+            <section className="card overflow-hidden text-sm">
+              <Link href={`/species/${species.id}`} className="flex gap-3 p-4 hover:bg-stone-50 dark:hover:bg-stone-800/40">
+                <SpeciesImage species={species} className="size-16 shrink-0 rounded-lg" />
+                <div className="min-w-0">
+                  <p className="font-semibold">{species.common_name_de}</p>
+                  <p className="text-xs text-stone-500 italic">{species.scientific_name}</p>
+                  <p className="mt-1 text-xs text-stone-500">
+                    {[
+                      species.winter_rest && "Winterruhe",
+                      species.fertilize_every_days && `düngen alle ${species.fertilize_every_days} Tage`,
+                      species.toxic_to_pets && "giftig für Haustiere",
+                    ].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+              </Link>
+              {species.care_notes && <p className="border-t border-stone-100 px-4 py-3 dark:border-stone-800">{species.care_notes}</p>}
+              <div className="px-4 pb-3"><ImageCredit species={species} /></div>
             </section>
           )}
 

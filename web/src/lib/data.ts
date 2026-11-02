@@ -1,6 +1,6 @@
 import "server-only";
 import { callFunction, createClient } from "@/lib/supabase/server";
-import type { HourPoint, Summary } from "@/lib/types";
+import type { Candidate, HourPoint, Species, Summary } from "@/lib/types";
 
 // Server-side reads. All run as the signed-in user, so they belong inside <Suspense> boundaries.
 
@@ -101,7 +101,7 @@ export async function getRoom(id: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("rooms")
-    .select("id, name, humidity_min, humidity_max, photo_paths, floor_plan")
+    .select("id, name, humidity_min, humidity_max, photo_paths, floor_plan, scan_path")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
@@ -128,4 +128,42 @@ export async function getVacations() {
     .order("starts_on");
   if (error) throw error;
   return data;
+}
+
+export async function getSpeciesList(): Promise<Species[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("species").select("*").order("common_name_de");
+  if (error) throw error;
+  return data as Species[];
+}
+
+export async function getSpecies(id: string): Promise<Species | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("species").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data as Species | null;
+}
+
+export async function getCandidates(roomId: string): Promise<Candidate[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("plant_candidates")
+    .select("id, description, species_guess, species_id, confidence, map_x, map_y, box, photo_path, closeup_path")
+    .eq("room_id", roomId)
+    .eq("status", "open")
+    .order("created_at");
+  if (error) throw error;
+  const urls = await signedUrls(data.flatMap((c) => [c.photo_path, c.closeup_path].filter((p): p is string => Boolean(p))));
+  return data.map((c) => ({
+    id: c.id,
+    description: c.description,
+    species_guess: c.species_guess,
+    species_id: c.species_id,
+    confidence: c.confidence,
+    map_x: c.map_x === null ? null : Number(c.map_x),
+    map_y: c.map_y === null ? null : Number(c.map_y),
+    box: c.box,
+    photo_url: c.photo_path ? (urls.get(c.photo_path) ?? null) : null,
+    closeup_url: c.closeup_path ? (urls.get(c.closeup_path) ?? null) : null,
+  }));
 }

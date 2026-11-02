@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { archivePlant } from "@/app/actions";
 import { PlantForm, RepotForm } from "@/components/plant-forms";
 import { Skeleton } from "@/components/ui";
-import { getPlant, getRooms, getSensors } from "@/lib/data";
+import { getPlant, getRooms, getSensors, getSpeciesList } from "@/lib/data";
 import { SOIL_TYPES, date, num } from "@/lib/format";
 import { sensorOptions } from "@/lib/sensors";
 
@@ -20,7 +20,7 @@ export default function PlantSettingsPage({ params }: PageProps<"/plants/[id]/se
 
 async function Settings({ params }: Pick<PageProps<"/plants/[id]/settings">, "params">) {
   const { id } = await params;
-  const [plant, rooms, sensors] = await Promise.all([getPlant(id), getRooms(), getSensors()]);
+  const [plant, rooms, sensors, species] = await Promise.all([getPlant(id), getRooms(), getSensors(), getSpeciesList()]);
   if (!plant) notFound();
 
   return (
@@ -34,6 +34,7 @@ async function Settings({ params }: Pick<PageProps<"/plants/[id]/settings">, "pa
           plant={{ ...plant, sensor_ids: plant.plant_sensors.map((s: { sensor_id: string }) => s.sensor_id) }}
           rooms={rooms}
           sensors={await sensorOptions(sensors, id)}
+          species={species}
         />
       </section>
 

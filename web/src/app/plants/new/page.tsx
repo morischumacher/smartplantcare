@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PlantForm } from "@/components/plant-forms";
 import { Skeleton } from "@/components/ui";
-import { getRooms, getSensors } from "@/lib/data";
+import { getRooms, getSensors, getSpeciesList } from "@/lib/data";
 import { sensorOptions } from "@/lib/sensors";
 
 export const metadata: Metadata = { title: "Neue Pflanze" };
@@ -21,6 +21,6 @@ export default function NewPlantPage() {
 }
 
 async function Form() {
-  const [rooms, sensors] = await Promise.all([getRooms(), getSensors()]);
-  return <PlantForm rooms={rooms} sensors={await sensorOptions(sensors)} />;
+  const [rooms, sensors, species] = await Promise.all([getRooms(), getSensors(), getSpeciesList()]);
+  return <PlantForm rooms={rooms} sensors={await sensorOptions(sensors)} species={species} />;
 }
