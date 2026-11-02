@@ -6,6 +6,8 @@
 // Body:   { "room_id": "<rooms.id>" }
 //
 // Inputs, all from the plant-photos bucket:
+// - rooms.scan_plan (optional): exact geometry from an IFC scan, already in floor_plan format.
+//   Kept unchanged; Claude only adds heaters, plants and – if the scan has none – furniture.
 // - rooms.scan_path (optional): floor plan exported by an iPhone LiDAR scan app (PDF or image).
 //   If present, walls, windows, doors and dimensions are taken from it exactly.
 // - rooms.photo_paths (1–4): room photos – heaters, plants, light and anything the scan lacks.
@@ -15,6 +17,7 @@
 import Anthropic from "npm:@anthropic-ai/sdk@1";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { HttpError, isSignedIn, json, loadImage, loadScan } from "../_shared/images.ts";
+import { dedupeDetections } from "../_shared/candidates.ts";
 import { matchSpecies } from "../_shared/species.ts";
 
 const supabase = createClient(
@@ -32,6 +35,9 @@ const SYSTEM = `Du erstellst aus Fotos eines Raums einen vereinfachten Grundriss
 Saugroboter-Karte. Koordinaten in Metern, Ursprung oben links, x nach rechts, y nach unten.
 
 Grundriss:
+- Liegt ein exakter Grundriss als JSON bei (aus einem IFC-Scan), ist er verbindlich: gib Maße, Umriss,
+  Fenster und Türen unverändert zurück und verwende genau sein Koordinatensystem. Ergänze Heizkörper,
+  und Möbel nur, wenn das JSON keine enthält.
 - Liegt ein Scan-Grundriss (aus einer LiDAR-App) bei, übernimm Umriss, Maße, Fenster und Türen exakt
   daraus, in seiner Ausrichtung. Die Fotos ergänzen, was der Scan nicht zeigt (vor allem Heizkörper
   und Pflanzen) und helfen, die Fotos im Grundriss zu verorten.
@@ -45,8 +51,11 @@ Grundriss:
 Pflanzen:
 - plants: Standort jeder bereits angelegten Pflanze (Mitte des Topfs), erkannt anhand der Referenzfotos.
   Ist eine nicht sicher zu erkennen, setze found auf false.
-- new_plants: alle weiteren Topfpflanzen auf den Fotos, die keiner angelegten Pflanze entsprechen –
-  jede Pflanze nur einmal, auch wenn sie auf mehreren Fotos zu sehen ist. Nenne die Art (wissenschaftlicher
+- new_plants: alle weiteren Topfpflanzen auf den Fotos, die keiner angelegten Pflanze entsprechen.
+  Dieselbe Pflanze ist meist auf mehreren Fotos aus verschiedenen Blickwinkeln zu sehen: Ordne zuerst
+  jede Pflanze einem Standort im Grundriss zu (anhand von Möbeln, Fenstern, Topf und Wuchsform) und
+  führe alle Ansichten desselben Standorts zu EINEM Eintrag zusammen; seen_on listet alle Fotos, auf
+  denen sie zu sehen ist. Zwei Einträge nur, wenn wirklich zwei Töpfe an verschiedenen Stellen stehen. Nenne die Art (wissenschaftlicher
   Name, aktuelle Nomenklatur, bevorzugt eine aus der Artenliste) und wie sicher du bist: "high" nur bei
   eindeutigen Merkmalen, "low" wenn die Pflanze klein, verdeckt oder unscharf ist. photo_index ist das Foto,
   auf dem sie am besten zu sehen ist, box ihr Bereich darauf als Anteil von Breite und Höhe (0–1).
@@ -126,6 +135,7 @@ function schema(plantIds: string[]) {
             x: { type: "number" },
             y: { type: "number" },
             photo_index: { type: "integer" },
+            seen_on: { type: "array", items: { type: "integer" } },
             box: {
               type: "object",
               properties: { x: { type: "number" }, y: { type: "number" }, w: { type: "number" }, h: { type: "number" } },
@@ -133,7 +143,7 @@ function schema(plantIds: string[]) {
               additionalProperties: false,
             },
           },
-          required: ["description", "species_guess", "common_name_de", "confidence", "x", "y", "photo_index", "box"],
+          required: ["description", "species_guess", "common_name_de", "confidence", "x", "y", "photo_index", "seen_on", "box"],
           additionalProperties: false,
         },
       },
@@ -159,6 +169,7 @@ type Plan = {
     x: number;
     y: number;
     photo_index: number;
+    seen_on: number[];
     box: Box;
   }[];
 };
@@ -168,7 +179,12 @@ const unit = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 1000) / 100
 const INSET = 0.05; // keep furniture off the wall line so labels stay readable
 
 /** Clamps everything into the room's bounding box; Claude's estimates can overshoot. */
-function normalize(plan: Plan, roomPhotos: string[], species: { id: string; scientific_name: string; common_name_de: string; aliases: string[] }[]) {
+function normalize(
+  plan: Plan,
+  roomPhotos: string[],
+  species: { id: string; scientific_name: string; common_name_de: string; aliases: string[] }[],
+  known: { id: string; species_id: string | null; map_x: number | null; map_y: number | null }[],
+) {
   const w = Math.min(Math.max(plan.width_m, 1), 30);
   const d = Math.min(Math.max(plan.depth_m, 1), 30);
   const cx = (v: number) => round(Math.min(w, Math.max(0, v)));
@@ -176,6 +192,13 @@ function normalize(plan: Plan, roomPhotos: string[], species: { id: string; scie
   const outline = plan.outline.length >= 3
     ? plan.outline.map((p) => [cx(p.x), cy(p.y)])
     : [[0, 0], [w, 0], [w, d], [0, d]];
+  const found = plan.plants.filter((p) => p.found).map((p) => ({ plant_id: p.plant_id, x: cx(p.x), y: cy(p.y), confidence: p.confidence }));
+  // Plants already set up: where Claude found them now, else where they stand on the saved map.
+  const knownSpots = known.flatMap((k) => {
+    const f = found.find((p) => p.plant_id === k.id);
+    const pos = f ?? (k.map_x !== null && k.map_y !== null ? { x: Number(k.map_x), y: Number(k.map_y) } : null);
+    return pos ? [{ species_id: k.species_id, x: pos.x, y: pos.y }] : [];
+  });
   return {
     floor_plan: {
       width_m: round(w),
@@ -196,13 +219,8 @@ function normalize(plan: Plan, roomPhotos: string[], species: { id: string; scie
       source: "ai",
       generated_at: new Date().toISOString(),
     },
-    plants: plan.plants.filter((p) => p.found).map((p) => ({
-      plant_id: p.plant_id,
-      x: cx(p.x),
-      y: cy(p.y),
-      confidence: p.confidence,
-    })),
-    candidates: plan.new_plants.map((p) => {
+    plants: found,
+    candidates: dedupeDetections(plan.new_plants.map((p) => {
       const photo = roomPhotos[Math.min(Math.max(p.photo_index, 1), roomPhotos.length) - 1];
       const bx = unit(p.box.x);
       const by = unit(p.box.y);
@@ -216,22 +234,27 @@ function normalize(plan: Plan, roomPhotos: string[], species: { id: string; scie
         map_x: cx(p.x),
         map_y: cy(p.y),
         photo_path: photo,
+        seen_on: p.seen_on.length > 0 ? p.seen_on : [p.photo_index],
         box: { x: bx, y: by, w: unit(Math.min(p.box.w, 1 - bx)), h: unit(Math.min(p.box.h, 1 - by)) },
       };
-    }),
+    }), knownSpots),
   };
 }
 
 async function planRoom(roomId: string) {
-  const { data: room, error } = await supabase.from("rooms").select("id, name, photo_paths, scan_path").eq("id", roomId).maybeSingle();
+  const { data: room, error } = await supabase
+    .from("rooms")
+    .select("id, name, photo_paths, scan_path, scan_plan")
+    .eq("id", roomId)
+    .maybeSingle();
   if (error) throw error;
   if (!room) throw new HttpError(404, "room not found");
   const roomPhotos = (room.photo_paths as string[]).slice(0, MAX_ROOM_PHOTOS);
-  if (roomPhotos.length === 0 && !room.scan_path) throw new HttpError(400, "room has no photos or scan");
+  if (roomPhotos.length === 0 && !room.scan_path && !room.scan_plan) throw new HttpError(400, "room has no photos or scan");
 
   const { data: plants, error: plantsError } = await supabase
     .from("plants")
-    .select("id, name, species, plant_photos(storage_path, taken_at)")
+    .select("id, name, species, species_id, map_x, map_y, plant_photos(storage_path, taken_at)")
     .eq("room_id", roomId)
     .is("archived_at", null)
     .order("taken_at", { referencedTable: "plant_photos", ascending: false })
@@ -241,6 +264,14 @@ async function planRoom(roomId: string) {
   if (speciesError) throw speciesError;
 
   const content: Anthropic.Beta.BetaContentBlockParam[] = [];
+  const scanPlan = room.scan_plan as ScanPlan | null;
+  if (scanPlan) {
+    const { source: _s, generated_at: _g, ...geometry } = scanPlan;
+    content.push({
+      type: "text",
+      text: `Exakter Grundriss aus dem IFC-Scan (Meter, Ursprung oben links):\n${JSON.stringify(geometry)}`,
+    });
+  }
   if (room.scan_path) {
     content.push({ type: "text", text: "Scan-Grundriss aus einer LiDAR-App (Maße und Wände exakt übernehmen):" });
     content.push(await loadScan(supabase, room.scan_path));
@@ -277,7 +308,31 @@ async function planRoom(roomId: string) {
   if (response.stop_reason === "refusal") throw new HttpError(422, "declined by the model");
   const text = response.content.find((b) => b.type === "text");
   if (!text || text.type !== "text") throw new Error(`no text in response (stop_reason ${response.stop_reason})`);
-  return normalize(JSON.parse(text.text) as Plan, roomPhotos, species);
+  const result = normalize(JSON.parse(text.text) as Plan, roomPhotos, species, plants);
+  return scanPlan ? { ...result, floor_plan: mergeScan(scanPlan, result.floor_plan) } : result;
+}
+
+type ScanPlan = {
+  width_m: number;
+  depth_m: number;
+  outline: number[][];
+  features: { kind: string; x1: number; y1: number; x2: number; y2: number }[];
+  furniture: { label: string; x: number; y: number; w: number; h: number }[];
+  source: string;
+  generated_at?: string;
+};
+
+/** Scan geometry wins; from Claude's plan only heaters (and furniture if the scan has none). */
+function mergeScan(scan: ScanPlan, ai: ReturnType<typeof normalize>["floor_plan"]) {
+  return {
+    width_m: scan.width_m,
+    depth_m: scan.depth_m,
+    outline: scan.outline,
+    features: [...scan.features.filter((f) => f.kind !== "heater"), ...ai.features.filter((f) => f.kind === "heater")],
+    furniture: scan.furniture.length > 0 ? scan.furniture : ai.furniture,
+    source: "scan",
+    generated_at: new Date().toISOString(),
+  };
 }
 
 Deno.serve(async (req) => {

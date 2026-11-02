@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { saveFloorPlan, setRoomPhotos, setRoomScan, suggestFloorPlan, type ActionResult } from "@/app/actions";
+import { saveFloorPlan, setRoomPhotos, setRoomScan, setRoomScanPlan, suggestFloorPlan, type ActionResult } from "@/app/actions";
 import { FloorPlanMap, type Selection } from "@/components/floor-plan";
 import { FormStatus } from "@/components/form-status";
 import { CameraIcon, SparkIcon } from "@/components/icons";
@@ -57,6 +57,7 @@ export function RoomMapEditor({
   photos,
   candidates,
   scan,
+  scanPlan,
 }: {
   roomId: string;
   plan: FloorPlan | null;
@@ -64,6 +65,7 @@ export function RoomMapEditor({
   photos: { path: string; url: string | null }[];
   candidates: Candidate[];
   scan: { path: string; url: string | null } | null;
+  scanPlan: FloorPlan | null;
 }) {
   const initialPositions = () => Object.fromEntries(plants.map((p) => [p.id, p.map]));
   const [draft, setDraft] = useState<FloorPlan | null>(null);
@@ -156,7 +158,7 @@ export function RoomMapEditor({
                   ? draftCandidates.map((c, i) => ({ id: String(i), x: c.map_x, y: c.map_y, label: c.common_name_de }))
                   : candidates
                       .filter((c) => c.map_x !== null && c.map_y !== null)
-                      .map((c) => ({ id: c.id, x: c.map_x!, y: c.map_y!, label: c.species_guess ?? "?" }))
+                      .map((c) => ({ id: c.id, x: c.map_x!, y: c.map_y!, label: c.label }))
               }
               positions={positions}
               editable={editing}
@@ -242,17 +244,18 @@ export function RoomMapEditor({
 
       <aside className="space-y-4">
         <RoomPhotos roomId={roomId} photos={photos} />
-        <RoomScan roomId={roomId} scan={scan} />
+        <RoomScan roomId={roomId} scan={scan} scanPlan={scanPlan} />
         <div className="card space-y-3 p-4 text-sm">
           <h2 className="font-semibold">Grundriss erstellen</h2>
-          <button className="btn w-full" onClick={generate} disabled={(photos.length === 0 && !scan) || busy !== null}>
+          <button className="btn w-full" onClick={generate} disabled={(photos.length === 0 && !scan && !scanPlan) || busy !== null}>
             <SparkIcon className="size-4" />
             {busy ? "Läuft…" : plan ? "Neu mit KI erstellen" : "Mit KI aus Fotos erstellen"}
           </button>
           {busy && <p className="animate-pulse text-xs text-stone-500">{busy}</p>}
           {photos.length === 0 && <p className="text-xs text-stone-500">Dafür zuerst Raumfotos hochladen.</p>}
           <p className="text-xs text-stone-500">
-            Erkennt dabei auch Pflanzen, die noch nicht angelegt sind{scan ? ", und übernimmt die Maße aus dem Scan" : ""}.
+            Erkennt dabei auch Pflanzen, die noch nicht angelegt sind
+            {scanPlan ? "; Wände, Fenster und Türen bleiben exakt wie im IFC-Scan" : scan ? ", und übernimmt die Maße aus dem Scan" : ""}.
           </p>
           {!plan && !editing && <ManualStart onStart={(w, d) => edit(rectangle(w, d))} />}
         </div>
@@ -468,38 +471,74 @@ function RoomPhotos({ roomId, photos }: { roomId: string; photos: { path: string
   );
 }
 
-/** Floor plan exported by an iPhone LiDAR scan app (PDF or image); gives plan-room exact dimensions. */
-function RoomScan({ roomId, scan }: { roomId: string; scan: { path: string; url: string | null } | null }) {
+/**
+ * Room scan from an iPhone LiDAR app. IFC is converted to an exact floor plan right here in the
+ * browser; PDF or an image of the plan is stored and read by the AI in plan-room.
+ */
+function RoomScan({
+  roomId,
+  scan,
+  scanPlan,
+}: {
+  roomId: string;
+  scan: { path: string; url: string | null } | null;
+  scanPlan: FloorPlan | null;
+}) {
   const input = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
+  const [step, setStep] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, start] = useTransition();
   const isPdf = scan?.path.endsWith(".pdf");
 
   function upload(file: File | undefined) {
     if (!file) return;
-    setBusy(true);
     setError(null);
     start(async () => {
       try {
+        const ext = file.name.split(".").pop()?.toLowerCase();
+        if (ext === "usdz" || ext === "usd") {
+          throw new Error("USDZ ist ein 3D-Modell und lässt sich hier nicht auslesen – bitte die IFC- oder PDF-Datei nehmen.");
+        }
+        if (ext === "ifc") {
+          setStep("Lese IFC-Scan…");
+          const [{ readIfc }, { planFromElements }] = await Promise.all([import("@/lib/ifc-load"), import("@/lib/ifc-plan")]);
+          const plan = planFromElements(await readIfc(file));
+          const res = await setRoomScanPlan(roomId, plan);
+          if (!res.ok) setError(res.error);
+          return;
+        }
+        setStep("Lade hoch…");
         const res = await setRoomScan(roomId, await uploadScan(file, `rooms/${roomId}/scan`));
         if (!res.ok) setError(res.error);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Upload fehlgeschlagen");
       } finally {
-        setBusy(false);
+        setStep(null);
         if (input.current) input.current.value = "";
       }
     });
   }
 
+  const count = (kind: string) => scanPlan?.features.filter((f) => f.kind === kind).length ?? 0;
+
   return (
     <div className="card space-y-3 p-4 text-sm">
       <h2 className="font-semibold">iPhone-Scan <span className="font-normal text-stone-400">(optional)</span></h2>
       <p className="text-xs text-stone-500">
-        Grundriss aus einer LiDAR-App (z. B. ezSpace, Polycam, magicplan) als PDF, Bild oder Screenshot. Wände, Fenster, Türen
-        und Maße kommen dann exakt aus dem Scan, Heizungen und Pflanzen aus den Fotos.
+        Aus einer LiDAR-App (z. B. ezSpace, Polycam, magicplan). <strong>IFC</strong> wird exakt übernommen; PDF, Bild oder Screenshot
+        liest die KI. Heizungen und Pflanzen kommen in beiden Fällen aus den Fotos.
       </p>
+      {scanPlan && (
+        <div className="flex items-center gap-2 rounded-lg bg-emerald-50 p-2.5 text-xs dark:bg-emerald-500/10">
+          <span>
+            IFC-Scan: {scanPlan.width_m.toLocaleString("de-DE")} × {scanPlan.depth_m.toLocaleString("de-DE")} m · {count("window")} Fenster ·{" "}
+            {count("door")} Türen · {scanPlan.furniture.length} Möbel
+          </span>
+          <button className="btn-danger ml-auto px-2 py-1 text-xs" onClick={() => start(async () => void (await setRoomScanPlan(roomId, null)))}>
+            Entfernen
+          </button>
+        </div>
+      )}
       {scan && (
         <div className="flex items-center gap-2">
           {isPdf ? (
@@ -517,9 +556,15 @@ function RoomScan({ roomId, scan }: { roomId: string; scan: { path: string; url:
           </button>
         </div>
       )}
-      <input ref={input} type="file" accept="application/pdf,image/*" className="hidden" onChange={(e) => upload(e.target.files?.[0])} />
-      <button className="btn-ghost w-full" onClick={() => input.current?.click()} disabled={busy}>
-        {busy ? "Lade hoch…" : scan ? "Scan ersetzen" : "Scan hochladen"}
+      <input
+        ref={input}
+        type="file"
+        accept=".ifc,.usdz,application/pdf,image/*"
+        className="hidden"
+        onChange={(e) => upload(e.target.files?.[0])}
+      />
+      <button className="btn-ghost w-full" onClick={() => input.current?.click()} disabled={step !== null}>
+        {step ?? (scan || scanPlan ? "Scan ersetzen" : "Scan hochladen (IFC, PDF, Bild)")}
       </button>
       {error && <p className="text-xs text-rose-600">{error}</p>}
     </div>

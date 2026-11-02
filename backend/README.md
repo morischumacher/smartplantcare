@@ -96,12 +96,13 @@ Claude zeichnet einen abstrakten Grundriss von oben (Umriss, Fenster, Türen, He
 
 | Quelle | liefert |
 | --- | --- |
-| iPhone-Scan (`rooms.scan_path`, optional): Grundriss aus einer LiDAR-App wie ezSpace, Polycam oder magicplan als PDF, Bild oder Screenshot | exakte Maße, Wände, Fenster, Türen |
+| IFC-Scan (`rooms.scan_plan`, optional): wird im Browser mit `web-ifc` in das `floor_plan`-Format umgerechnet | exakte Wände, Fenster, Türen, Möbel – bleiben unverändert, die KI ergänzt nur Heizkörper und Pflanzen |
+| iPhone-Scan als Bild (`rooms.scan_path`, optional): Grundriss aus einer LiDAR-App wie ezSpace, Polycam oder magicplan als PDF, Bild oder Screenshot | exakte Maße, Wände, Fenster, Türen |
 | Raumfotos (`rooms.photo_paths`, 1–4) | Heizkörper (erkennt RoomPlan nicht), Pflanzen, Möbel; ohne Scan auch die geschätzte Geometrie |
 | letztes Tagebuchfoto jeder Pflanze im Raum | Wiedererkennen der angelegten Pflanzen |
 | Artenliste aus `species` | Artvermutung für neue Pflanzen |
 
-Antwort: `floor_plan`, Positionen der angelegten Pflanzen und `candidates` – neu entdeckte Pflanzen mit Artvermutung, Sicherheit, Position und Ausschnitt im Foto. Die Funktion speichert nichts; die Web-App zeigt den Vorschlag, und beim Speichern landen Grundriss, Positionen und Kandidaten in der Datenbank. Kandidaten bestätigt man einzeln (Name/Art korrigieren), lässt unsichere per Nahaufnahme bestimmen oder verwirft sie.
+Antwort: `floor_plan`, Positionen der angelegten Pflanzen und `candidates`. Dieselbe Pflanze auf mehreren Fotos wird zu einem Kandidaten zusammengeführt (gleiche Art, < 1 m auseinander, siehe [`_shared/candidates.ts`](supabase/functions/_shared/candidates.ts)); Kandidaten direkt an einer schon angelegten Pflanze entfallen – neu entdeckte Pflanzen mit Artvermutung, Sicherheit, Position und Ausschnitt im Foto. Die Funktion speichert nichts; die Web-App zeigt den Vorschlag, und beim Speichern landen Grundriss, Positionen und Kandidaten in der Datenbank. Kandidaten bestätigt man einzeln (Name/Art korrigieren), lässt unsichere per Nahaufnahme bestimmen oder verwirft sie.
 
 Kosten: grob 5–15 Cent pro Grundriss.
 

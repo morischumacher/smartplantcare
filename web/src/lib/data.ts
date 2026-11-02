@@ -101,7 +101,7 @@ export async function getRoom(id: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("rooms")
-    .select("id, name, humidity_min, humidity_max, photo_paths, floor_plan, scan_path")
+    .select("id, name, humidity_min, humidity_max, photo_paths, floor_plan, scan_path, scan_plan")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
@@ -148,7 +148,7 @@ export async function getCandidates(roomId: string): Promise<Candidate[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("plant_candidates")
-    .select("id, description, species_guess, species_id, confidence, map_x, map_y, box, photo_path, closeup_path")
+    .select("id, description, species_guess, species_id, confidence, map_x, map_y, box, photo_path, closeup_path, species(common_name_de)")
     .eq("room_id", roomId)
     .eq("status", "open")
     .order("created_at");
@@ -159,6 +159,7 @@ export async function getCandidates(roomId: string): Promise<Candidate[]> {
     description: c.description,
     species_guess: c.species_guess,
     species_id: c.species_id,
+    label: (c.species as unknown as { common_name_de: string } | null)?.common_name_de ?? c.species_guess ?? "?",
     confidence: c.confidence,
     map_x: c.map_x === null ? null : Number(c.map_x),
     map_y: c.map_y === null ? null : Number(c.map_y),

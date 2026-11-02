@@ -42,7 +42,7 @@ export interface FloorPlan {
   outline: [number, number][];
   features: { kind: "window" | "door" | "heater"; x1: number; y1: number; x2: number; y2: number }[];
   furniture: { label: string; x: number; y: number; w: number; h: number }[];
-  source: "ai" | "manual";
+  source: "ai" | "manual" | "scan";
   generated_at?: string;
 }
 
@@ -111,6 +111,8 @@ export interface Candidate {
   description: string | null;
   species_guess: string | null;
   species_id: string | null;
+  /** German name of the matched species, else the guess. */
+  label: string;
   confidence: "high" | "medium" | "low";
   map_x: number | null;
   map_y: number | null;

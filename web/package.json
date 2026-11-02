@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "mkdir -p public && cp node_modules/web-ifc/web-ifc.wasm public/web-ifc.wasm",
+    "test": "node --test src/lib/*.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -15,7 +17,8 @@
     "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "web-ifc": "^0.0.78"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",

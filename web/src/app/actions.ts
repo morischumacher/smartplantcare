@@ -377,6 +377,18 @@ export async function setRoomScan(roomId: string, path: string | null): Promise<
   return { ok: true };
 }
 
+/** Exact geometry from an IFC scan: kept as scan_plan and shown as the room's map right away. */
+export async function setRoomScanPlan(roomId: string, plan: FloorPlan | null): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("rooms")
+    .update(plan ? { scan_plan: plan, floor_plan: plan } : { scan_plan: null })
+    .eq("id", roomId);
+  if (error) return fail(error);
+  refresh();
+  return { ok: true };
+}
+
 // --- Species & detected plants ---------------------------------------------
 
 /** Existing species matching `name`, or a new profile written by Claude. */

@@ -44,6 +44,7 @@ async function Room({ params }: Pick<PageProps<"/rooms/[id]">, "params">) {
         photos={paths.map((p) => ({ path: p, url: urls.get(p) ?? null }))}
         candidates={candidates}
         scan={room.scan_path ? { path: room.scan_path, url: urls.get(room.scan_path) ?? null } : null}
+        scanPlan={room.scan_plan as FloorPlan | null}
       />
       <MapLegend />
       <CandidateList candidates={candidates} species={species} />

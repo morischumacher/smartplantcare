@@ -73,7 +73,7 @@ esphome run plant-gateway.yaml             # Firmware bauen + flashen (USB oder 
 ```bash
 cd web
 npm run dev                                # http://localhost:3000, braucht web/.env.local
-npm run build && npm run lint
+npm run build && npm run lint && npm test   # test: IFC-Umrechnung (src/lib/*.test.ts)
 ```
 
 ## Stand

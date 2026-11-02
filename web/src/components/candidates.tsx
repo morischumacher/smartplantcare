@@ -17,10 +17,17 @@ const CONFIDENCE = {
   low: { label: "unsicher", cls: "bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-200" },
 };
 
+/** Widens the AI's box by half its size – its coordinates are approximate, better show some context. */
+function pad(b: Box): Box {
+  const x = Math.max(0, b.x - b.w * 0.25);
+  const y = Math.max(0, b.y - b.h * 0.25);
+  return { x, y, w: Math.min(1 - x, b.w * 1.5), h: Math.min(1 - y, b.h * 1.5) };
+}
+
 /** Shows the part of a photo inside `box` (fractions), keeping the aspect ratio. */
 export function CropThumb({ url, box, className = "" }: { url: string; box: Box | null; className?: string }) {
   const [aspect, setAspect] = useState<number | null>(null);
-  const b = box && box.w > 0.02 && box.h > 0.02 ? box : { x: 0, y: 0, w: 1, h: 1 };
+  const b = box && box.w > 0.02 && box.h > 0.02 ? pad(box) : { x: 0, y: 0, w: 1, h: 1 };
   return (
     <div className={`relative overflow-hidden rounded-lg bg-stone-100 dark:bg-stone-800 ${className}`} style={{ aspectRatio: aspect ?? 1 }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -87,7 +94,11 @@ function CandidateCard({ candidate: c, species }: { candidate: Candidate; specie
     <div className={`card space-y-3 p-4 ${unsure ? "border-rose-200 dark:border-rose-900" : ""}`}>
       <div className="flex gap-3">
         <div className="flex w-24 shrink-0 flex-col gap-1.5">
-          {c.photo_url && <CropThumb url={c.photo_url} box={c.box} className="w-24" />}
+          {c.photo_url && (
+            <a href={c.photo_url} target="_blank" rel="noreferrer" title="Ganzes Foto öffnen">
+              <CropThumb url={c.photo_url} box={c.box} className="w-24" />
+            </a>
+          )}
           {c.closeup_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={c.closeup_url} alt="Nahaufnahme" className="aspect-square w-24 rounded-lg object-cover" />
