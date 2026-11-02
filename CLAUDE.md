@@ -34,7 +34,7 @@ Govee H5075 ─────────────┼─ BLE ─▶ Atom Lite /
 | Ordner | Inhalt |
 | --- | --- |
 | `firmware/` | ESPHome-YAML für den M5Stack Atom Lite |
-| `backend/supabase/` | Supabase-Projekt: `migrations/` (SQL), `functions/` (Deno Edge Functions) |
+| `backend/supabase/` | Supabase-Projekt `zvymcgkkjrfxqoartwrp` (eu-west-1): `migrations/` (SQL), `functions/` (Deno Edge Functions); Deploy automatisch per GitHub-Integration bei Push auf `main` |
 | `web/` | Web-App (PWA, Vercel) – Framework noch offen |
 | `scriptable/` | JavaScript für das iPhone-Widget |
 | `garmin/` | Connect-IQ-Projekt (Monkey C) für den Forerunner 165 |
@@ -46,7 +46,8 @@ Govee H5075 ─────────────┼─ BLE ─▶ Atom Lite /
 - **Zeit:** immer `timestamptz` in UTC speichern; Umrechnung nach Europe/Berlin erst in den Clients.
 - **Datenbank:** Schemaänderungen nur als neue Datei in `backend/supabase/migrations/` (nie alte Migrationen ändern, sobald sie deployt sind). RLS ist auf allen Tabellen aktiv.
 - **Secrets:** nie ins Repo. Lokal in `backend/supabase/functions/.env` (gitignored), produktiv per `supabase secrets set`.
-- **Sensoren** werden über ihre BLE-MAC-Adresse (Großbuchstaben, mit Doppelpunkten) identifiziert. Unbekannte MACs legt `ingest` automatisch als neue Sensoren an.
+- **Sensoren** werden über ihre BLE-MAC-Adresse (Großbuchstaben, mit Doppelpunkten) identifiziert. Die Firmware erkennt Sensoren automatisch (keine MACs im YAML), unbekannte MACs legt `ingest` als neue Sensoren an.
+- **Firmware:** BLE-Auswertung liegt in `firmware/plant_ble.h` ohne ESPHome-Abhängigkeiten, damit sie am Mac testbar ist; das YAML ruft sie nur auf.
 - Vor größeren Entscheidungen (Framework, neue Dienste, Datenmodell-Umbauten) nachfragen.
 - Nach jedem Umsetzungsschritt testen, dann committen.
 
@@ -60,10 +61,16 @@ npx supabase functions serve --env-file supabase/functions/.env
 node --test supabase/functions/ingest/     # Unit-Tests für die Payload-Validierung
 ```
 
+```bash
+cd firmware
+test/run.sh                                # Unit-Tests für die BLE-Auswertung (plant_ble.h)
+esphome run plant-gateway.yaml             # Firmware bauen + flashen (USB oder OTA)
+```
+
 ## Stand
 
 - [x] Schritt 1: Schema + `ingest`
-- [ ] Schritt 2: ESPHome auf dem Atom Lite
+- [ ] Schritt 2: ESPHome auf dem Atom Lite – Firmware fertig und kompiliert, Test mit echter Hardware steht aus
 - [ ] Schritt 3: `summary` + Gieß-Logik
 - [ ] Schritt 4: Web-App
 - [ ] Schritt 5: ntfy

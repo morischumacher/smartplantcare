@@ -1,0 +1,76 @@
+# Plant gateway: M5Stack Atom Lite listens passively for Flower Care (HHCCJCY01) and
+# Govee H5075 advertisements and posts the collected values to Supabase `ingest`.
+# Sensors are discovered automatically; no MACs need to be configured here.
+
+substitutions:
+  name: plant-gateway
+  send_interval: 5min
+
+esphome:
+  name: ${name}
+  friendly_name: Plant Gateway
+  includes:
+    - plant_ble.h
+
+esp32:
+  board: m5stack-atom
+  framework:
+    type: esp-idf
+
+logger:
+  level: INFO
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # If the Wi-Fi is unreachable, the gateway opens this access point for reconfiguration.
+  ap:
+    ssid: Plant-Gateway-Setup
+    password: !secret fallback_ap_password
+
+captive_portal:
+
+# Over-the-air updates from the laptop, so the Atom Lite never needs to come off the wall.
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+http_request:
+  timeout: 10s
+  verify_ssl: true
+
+esp32_ble_tracker:
+  scan_parameters:
+    # Passive: listen to advertisements only, no scan requests. Saves the sensors' batteries.
+    active: false
+  on_ble_advertise:
+    - then:
+        - lambda: plant_ble::store().on_advertise(x);
+
+interval:
+  - interval: ${send_interval}
+    then:
+      - if:
+          condition:
+            and:
+              - wifi.connected:
+              - lambda: return plant_ble::store().fresh_count() > 0;
+          then:
+            - http_request.post:
+                url: !secret ingest_url
+                request_headers:
+                  Content-Type: application/json
+                  x-device-secret: !secret ingest_secret
+                body: !lambda return plant_ble::store().take_json();
+                capture_response: true
+                on_response:
+                  then:
+                    - logger.log:
+                        level: INFO
+                        format: "ingest: HTTP %d %s"
+                        args: [response->status_code, body.c_str()]
+                on_error:
+                  then:
+                    - logger.log:
+                        level: WARN
+                        format: "ingest: request failed"
