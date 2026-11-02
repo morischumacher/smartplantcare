@@ -112,6 +112,13 @@ export function FloorPlanMap({
   const centre = { x: w / 2, y: d / 2 };
   const vb = { x: -PAD, y: -PAD, w: w + 2 * PAD, h: d + 2 * PAD };
   const fontSize = Math.max(0.13, Math.min(0.2, Math.max(w, d) / 28));
+  /** Keeps a label under a pin inside the map: near the left or right edge it is aligned to that side. */
+  const labelAt = (x: number, text: string, size: number) => {
+    const half = text.length * size * 0.3;
+    if (x + half > w + PAD - 0.05) return { textAnchor: "end" as const, x: 0.17 };
+    if (x - half < -PAD + 0.05) return { textAnchor: "start" as const, x: -0.17 };
+    return { textAnchor: "middle" as const };
+  };
 
   const placed = spread(
     plants
@@ -307,7 +314,7 @@ export function FloorPlanMap({
               <text
                 y={0.17 + fontSize * 0.95}
                 fontSize={fontSize * 0.85}
-                textAnchor="middle"
+                {...labelAt(c.x, c.label, fontSize * 0.85)}
                 className="fill-violet-700 dark:fill-violet-300"
                 style={{ paintOrder: "stroke" }}
                 stroke="var(--halo-text, #ecfdf5)"
@@ -370,7 +377,7 @@ export function FloorPlanMap({
                 <text
                   y={r + fontSize * 0.95}
                   fontSize={fontSize}
-                  textAnchor="middle"
+                  {...labelAt(at.x, height ? `${plant.name} · ${height}` : plant.name, fontSize)}
                   className="pointer-events-none fill-stone-700 font-medium dark:fill-stone-200"
                   style={{ paintOrder: "stroke" }}
                   stroke="var(--halo-text, #ecfdf5)"
