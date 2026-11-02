@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { archivePlant } from "@/app/actions";
-import { PlantForm, RepotForm } from "@/components/plant-forms";
+import { DeletePlantButton, PlantForm, RepotForm } from "@/components/plant-forms";
 import { Skeleton } from "@/components/ui";
 import { getPlant, getRooms, getSensors, getSpeciesList } from "@/lib/data";
 import { SOIL_TYPES, date, num } from "@/lib/format";
@@ -65,6 +65,12 @@ async function Settings({ params }: Pick<PageProps<"/plants/[id]/settings">, "pa
         <form action={archivePlant.bind(null, id)}>
           <button className="btn-danger border border-rose-200 dark:border-rose-900">Pflanze archivieren</button>
         </form>
+      </section>
+
+      <section className="card p-5">
+        <h2 className="mb-1 font-semibold">Löschen</h2>
+        <p className="mb-3 text-sm text-stone-500">Entfernt die Pflanze mit Gießdaten, Töpfen und Fotos. Die Messwerte bleiben beim Sensor, der Sensor wird frei. Lässt sich nicht rückgängig machen.</p>
+        <DeletePlantButton plantId={id} name={plant.name} />
       </section>
     </div>
   );

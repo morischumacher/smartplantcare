@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useRef, useState } from "react";
-import { repot, savePlant } from "@/app/actions";
+import { useRouter } from "next/navigation";
+import { useActionState, useRef, useState, useTransition } from "react";
+import { deletePlant, identifyPhoto, repot, savePlant } from "@/app/actions";
 import { FormStatus } from "@/components/form-status";
 import { SpeciesImage, SpeciesSelect } from "@/components/species-ui";
 import { SOIL_TYPES } from "@/lib/format";
+import { uploadPhoto } from "@/lib/image";
 import type { Species } from "@/lib/types";
 
 type Plant = {
@@ -68,7 +70,10 @@ export function PlantForm({
   const [state, action, pending] = useActionState(savePlant, null);
   const form = useRef<HTMLFormElement>(null);
   const [speciesId, setSpeciesId] = useState(plant?.species_id ?? null);
-  const picked = species.find((s) => s.id === speciesId) ?? null;
+  // a species the AI just created is not in the list until the page refreshes
+  const [found, setFound] = useState<Species | null>(null);
+  const list = found && !species.some((s) => s.id === found.id) ? [found, ...species] : species;
+  const picked = list.find((s) => s.id === speciesId) ?? null;
 
   function apply(sp: Species) {
     const el = form.current!.elements as unknown as Record<string, HTMLInputElement | HTMLSelectElement | undefined>;
@@ -85,12 +90,25 @@ export function PlantForm({
         <div className="flex-1 space-y-1.5">
           <span className="label">Pflanzenart</span>
           <SpeciesSelect
-            species={species}
+            species={list}
             name="species_id"
             value={speciesId}
             onChange={(sp) => {
               setSpeciesId(sp?.id ?? null);
               if (sp && (!plant || confirm(`Zielwerte von „${sp.common_name_de}“ übernehmen?`))) apply(sp);
+            }}
+          />
+          <FromPhoto
+            onFound={(sp, name) => {
+              const el = form.current!.elements as unknown as Record<string, HTMLInputElement | undefined>;
+              if (el.name && !el.name.value) el.name.value = name;
+              if (!sp) {
+                if (el.species && !el.species.value) el.species.value = name;
+                return;
+              }
+              setFound(sp);
+              setSpeciesId(sp.id);
+              if (!plant || confirm(`Zielwerte von „${sp.common_name_de}“ übernehmen?`)) apply(sp);
             }}
           />
           <p className="text-xs text-stone-500">
@@ -182,5 +200,70 @@ export function RepotForm({ plantId }: { plantId: string }) {
         <FormStatus state={state} />
       </div>
     </form>
+  );
+}
+
+export function DeletePlantButton({ plantId, name }: { plantId: string; name: string }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <>
+      <button
+        className="btn-danger border border-rose-200 dark:border-rose-900"
+        disabled={pending}
+        onClick={() => {
+          if (!confirm(`„${name}“ mit Gießdaten, Töpfen und Fotos endgültig löschen?`)) return;
+          start(async () => {
+            const res = await deletePlant(plantId);
+            if (res.ok) router.push("/");
+            else setError(res.error);
+          });
+        }}
+      >
+        {pending ? "Lösche…" : "Pflanze löschen"}
+      </button>
+      {error && <p className="mt-2 text-xs text-rose-600">{error}</p>}
+    </>
+  );
+}
+
+/** Photo → species via Claude. The photo is kept and becomes the plant's first diary photo. */
+function FromPhoto({ onFound }: { onFound: (sp: Species | null, name: string) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [path, setPath] = useState<string | null>(null);
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pending, start] = useTransition();
+
+  function pick(file: File | undefined) {
+    if (!file) return;
+    setNote(null);
+    start(async () => {
+      try {
+        const p = await uploadPhoto(file, "identify");
+        setPath(p);
+        const r = await identifyPhoto(p);
+        if (!r.ok) return setNote({ ok: false, text: r.error });
+        if (!r.name) return setNote({ ok: false, text: `Keine Pflanze erkannt. ${r.reasoning}` });
+        onFound(r.species, r.name);
+        const sure = { high: "sicher", medium: "ziemlich sicher", low: "unsicher" }[r.confidence];
+        setNote({ ok: true, text: `${r.name} (${sure}): ${r.reasoning}${r.species ? "" : " – nicht in der Artenliste, bitte Art von Hand wählen."}` });
+      } catch (e) {
+        setNote({ ok: false, text: e instanceof Error ? e.message : "Upload fehlgeschlagen" });
+      } finally {
+        if (input.current) input.current.value = "";
+      }
+    });
+  }
+
+  return (
+    <div className="space-y-1">
+      {path && <input type="hidden" name="photo_path" value={path} />}
+      <input ref={input} type="file" accept="image/*" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
+      <button type="button" className="btn-ghost w-full" disabled={pending} onClick={() => input.current?.click()}>
+        {pending ? "Erkenne Art…" : path ? "Anderes Bild" : "Von Bild erkennen"}
+      </button>
+      {note && <p className={`text-xs ${note.ok ? "text-emerald-700 dark:text-emerald-400" : "text-rose-600"}`}>{note.text}</p>}
+    </div>
   );
 }

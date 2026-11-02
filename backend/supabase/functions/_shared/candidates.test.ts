@@ -35,3 +35,12 @@ test("detections at an existing plant's spot are dropped", () => {
   const out = dedupeDetections([det({}), det({ species_id: "dieff", map_x: 2.5 })], [{ species_id: "pothos", x: 1.2, y: 1.1 }]);
   assert.deepEqual(out.map((d) => d.species_id), ["dieff"]);
 });
+
+test("same species stacked on different shelves stays two plants", () => {
+  assert.equal(dedupeDetections([det({ height_m: 0 }), det({ height_m: 1.2 })]).length, 2);
+  assert.equal(dedupeDetections([det({ height_m: 1.1 }), det({ height_m: 1.3, map_x: 1.4 })]).length, 1);
+});
+
+test("a known plant on another level does not hide a detection", () => {
+  assert.equal(dedupeDetections([det({ height_m: 1.6 })], [{ species_id: "pothos", x: 1, y: 1, height_m: 0 }]).length, 1);
+});

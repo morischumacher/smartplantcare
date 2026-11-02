@@ -1,14 +1,25 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { saveFloorPlan, setRoomPhotos, setRoomScan, setRoomScanPlan, suggestFloorPlan, type ActionResult } from "@/app/actions";
+import {
+  createPlantOnMap,
+  deletePlant,
+  rescanPlants,
+  saveFloorPlan,
+  setRoomPhotos,
+  setRoomScan,
+  setRoomScanPlan,
+  suggestFloorPlan,
+  type ActionResult,
+} from "@/app/actions";
 import { FloorPlanMap, type Selection } from "@/components/floor-plan";
 import { FormStatus } from "@/components/form-status";
 import { CameraIcon, SparkIcon } from "@/components/icons";
+import { SpeciesSelect } from "@/components/species-ui";
 import { uploadPhoto, uploadScan } from "@/lib/image";
-import type { Candidate, CandidateSuggestion, FloorPlan, PlantSummary } from "@/lib/types";
+import type { Candidate, CandidateSuggestion, FloorPlan, PlantSummary, Species } from "@/lib/types";
 
-type Pos = { x: number; y: number };
+type Pos = { x: number; y: number; h?: number | null };
 type Positions = Record<string, Pos | null>;
 
 const FEATURE_NAMES = { window: "Fenster", door: "Tür", heater: "Heizung" };
@@ -18,6 +29,14 @@ type Wall = "top" | "right" | "bottom" | "left";
 const WALLS: Record<Wall, string> = { top: "oben", right: "rechts", bottom: "unten", left: "links" };
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
+
+/** Typical heights of the pot's base above the floor. */
+const LEVELS: [string, number][] = [
+  ["Boden", 0],
+  ["Tisch", 0.75],
+  ["Fensterbank", 0.9],
+  ["Regal oben", 1.8],
+];
 
 /** A feature as a stretch along one of the bounding-box walls, measured from the wall's left/top end. */
 function onWall(kind: Kind, wall: Wall, start: number, length: number, plan: FloorPlan): Feature {
@@ -58,6 +77,7 @@ export function RoomMapEditor({
   candidates,
   scan,
   scanPlan,
+  species,
 }: {
   roomId: string;
   plan: FloorPlan | null;
@@ -66,6 +86,7 @@ export function RoomMapEditor({
   candidates: Candidate[];
   scan: { path: string; url: string | null } | null;
   scanPlan: FloorPlan | null;
+  species: Species[];
 }) {
   const initialPositions = () => Object.fromEntries(plants.map((p) => [p.id, p.map]));
   const [draft, setDraft] = useState<FloorPlan | null>(null);
@@ -74,7 +95,10 @@ export function RoomMapEditor({
   const [selected, setSelected] = useState<Selection>(null);
   const [state, setState] = useState<ActionResult | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const [, start] = useTransition();
+  // plants created while editing are not in `positions` yet; they fall back to their saved spot
+  const posOf = (p: PlantSummary) => (p.id in positions ? positions[p.id] : p.map);
 
   const editing = draft !== null;
   const shown = draft ?? plan;
@@ -101,7 +125,7 @@ export function RoomMapEditor({
       setDraft(res.suggestion.floor_plan);
       setDraftCandidates(res.suggestion.candidates);
       const next = initialPositions();
-      for (const p of res.suggestion.plants) next[p.plant_id] = { x: p.x, y: p.y };
+      for (const p of res.suggestion.plants) next[p.plant_id] = { x: p.x, y: p.y, h: p.height_m };
       setPositions(next);
       const missing = plants.filter((p) => !next[p.id]).length;
       const found = res.suggestion.candidates.length;
@@ -116,13 +140,26 @@ export function RoomMapEditor({
     });
   }
 
+  function rescan() {
+    setState(null);
+    setBusy("Die KI sucht auf den Fotos nach Pflanzen… (dauert etwa eine Minute)");
+    start(async () => {
+      const res = await rescanPlants(roomId);
+      setBusy(null);
+      setState(res);
+    });
+  }
+
   function save() {
     if (!draft) return;
     start(async () => {
       const res = await saveFloorPlan({
         roomId,
         floorPlan: { ...draft, generated_at: draft.generated_at ?? new Date().toISOString() },
-        positions: plants.map((p) => ({ plantId: p.id, x: positions[p.id]?.x ?? null, y: positions[p.id]?.y ?? null })),
+        positions: plants.map((p) => {
+          const pos = posOf(p);
+          return { plantId: p.id, x: pos?.x ?? null, y: pos?.y ?? null, h: pos?.h ?? null };
+        }),
         candidates: draftCandidates ?? undefined,
       });
       setState(res);
@@ -135,7 +172,7 @@ export function RoomMapEditor({
   }
 
   function removeSelected() {
-    if (!draft || !selected) return;
+    if (!draft || !selected || selected.kind === "plant") return;
     const next = structuredClone(draft);
     if (selected.kind === "feature") next.features.splice(selected.index, 1);
     else next.furniture.splice(selected.index, 1);
@@ -143,7 +180,8 @@ export function RoomMapEditor({
     setSelected(null);
   }
 
-  const unplaced = plants.filter((p) => !positions[p.id]);
+  const unplaced = plants.filter((p) => !posOf(p));
+  const selectedPlant = selected?.kind === "plant" ? plants.find((p) => p.id === selected.id) : undefined;
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
@@ -164,7 +202,9 @@ export function RoomMapEditor({
               editable={editing}
               selected={selected}
               onSelect={setSelected}
-              onMovePlant={(id, pos) => setPositions((cur) => ({ ...cur, [id]: pos }))}
+              onMovePlant={(id, pos) =>
+                setPositions((cur) => ({ ...cur, [id]: { ...pos, h: (id in cur ? cur[id] : plants.find((p) => p.id === id)?.map)?.h ?? null } }))
+              }
               onMoveFurniture={(i, pos) =>
                 setDraft((cur) => {
                   if (!cur) return cur;
@@ -191,6 +231,10 @@ export function RoomMapEditor({
             <p className="text-stone-500">Pflanzen und Möbel ziehen, Elemente antippen zum Bearbeiten. „Ab“ zählt von links bzw. oben.</p>
             <AddElements
               onAdd={(el) => {
+                if (el === "plant") {
+                  setSelected(null);
+                  return setAdding(true);
+                }
                 const next = structuredClone(draft!);
                 if (el === "furniture") {
                   next.furniture.push({ label: "Möbel", x: 0.2, y: r2(Math.max(0, next.depth_m - 0.8)), w: 1, h: 0.6 });
@@ -203,7 +247,45 @@ export function RoomMapEditor({
                 setDraft(next);
               }}
             />
-            {selected && (
+            {adding && (
+              <NewPlantPanel
+                species={species}
+                onCancel={() => setAdding(false)}
+                onCreate={async (name, speciesId, h) => {
+                  const pos = { x: r2(draft!.width_m / 2), y: r2(draft!.depth_m / 2), h };
+                  const res = await createPlantOnMap({ roomId, name, speciesId, ...pos });
+                  if (!res.ok) return res.error;
+                  setPositions((cur) => ({ ...cur, [res.id]: pos }));
+                  setAdding(false);
+                  setSelected({ kind: "plant", id: res.id });
+                  setState({ ok: true, message: `${name} angelegt – auf der Karte an die richtige Stelle ziehen.` });
+                  return null;
+                }}
+              />
+            )}
+            {selectedPlant && (
+              <PlantPanel
+                plant={selectedPlant}
+                height={posOf(selectedPlant)?.h ?? null}
+                onHeight={(h) => {
+                  const pos = posOf(selectedPlant);
+                  if (pos) setPositions((cur) => ({ ...cur, [selectedPlant.id]: { ...pos, h } }));
+                }}
+                onUnplace={() => {
+                  setPositions((cur) => ({ ...cur, [selectedPlant.id]: null }));
+                  setSelected(null);
+                }}
+                onDelete={() => {
+                  if (!confirm(`„${selectedPlant.name}“ mit Gießdaten, Töpfen und Fotos endgültig löschen?`)) return;
+                  start(async () => {
+                    const res = await deletePlant(selectedPlant.id);
+                    setState(res);
+                    if (res.ok) setSelected(null);
+                  });
+                }}
+              />
+            )}
+            {selected && selected.kind !== "plant" && (
               <SelectedPanel
                 plan={draft!}
                 selected={selected}
@@ -251,11 +333,17 @@ export function RoomMapEditor({
             <SparkIcon className="size-4" />
             {busy ? "Läuft…" : plan ? "Neu mit KI erstellen" : "Mit KI aus Fotos erstellen"}
           </button>
+          {plan && photos.length > 0 && (
+            <button className="btn-ghost w-full" onClick={rescan} disabled={busy !== null || editing}>
+              Pflanzen neu suchen
+            </button>
+          )}
           {busy && <p className="animate-pulse text-xs text-stone-500">{busy}</p>}
           {photos.length === 0 && <p className="text-xs text-stone-500">Dafür zuerst Raumfotos hochladen.</p>}
           <p className="text-xs text-stone-500">
             Erkennt dabei auch Pflanzen, die noch nicht angelegt sind
             {scanPlan ? "; Wände, Fenster und Türen bleiben exakt wie im IFC-Scan" : scan ? ", und übernimmt die Maße aus dem Scan" : ""}.
+            {plan && photos.length > 0 && " „Pflanzen neu suchen“ lässt den Grundriss, wie er ist, und sucht nur nach Pflanzen."}
           </p>
           {!plan && !editing && <ManualStart onStart={(w, d) => edit(rectangle(w, d))} />}
         </div>
@@ -264,9 +352,12 @@ export function RoomMapEditor({
   );
 }
 
-function AddElements({ onAdd }: { onAdd: (el: Kind | "furniture") => void }) {
+function AddElements({ onAdd }: { onAdd: (el: Kind | "furniture" | "plant") => void }) {
   return (
     <div className="flex flex-wrap gap-1.5">
+      <button type="button" className="btn-ghost px-2.5 py-1 text-xs" onClick={() => onAdd("plant")}>
+        + Pflanze
+      </button>
       {(["window", "heater", "door"] as const).map((k) => (
         <button key={k} type="button" className="btn-ghost px-2.5 py-1 text-xs" onClick={() => onAdd(k)}>
           + {FEATURE_NAMES[k]}
@@ -279,6 +370,110 @@ function AddElements({ onAdd }: { onAdd: (el: Kind | "furniture") => void }) {
   );
 }
 
+function HeightField({ value, onChange }: { value: number | null; onChange: (h: number | null) => void }) {
+  return (
+    <div>
+      <span className="label">Höhe über dem Boden (m)</span>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <input
+          className="input w-20"
+          type="number"
+          step="0.1"
+          min="0"
+          max="3"
+          value={value ?? ""}
+          aria-label="Höhe in m"
+          onChange={(e) => onChange(e.target.value === "" ? null : r2(Math.min(3, Math.max(0, Number(e.target.value)))))}
+        />
+        {LEVELS.map(([label, h]) => (
+          <button
+            key={label}
+            type="button"
+            className={`rounded-full px-2.5 py-1 text-xs ${value === h ? "bg-emerald-600 text-white" : "bg-stone-100 hover:bg-emerald-100 dark:bg-stone-800"}`}
+            onClick={() => onChange(h)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PlantPanel({
+  plant,
+  height,
+  onHeight,
+  onUnplace,
+  onDelete,
+}: {
+  plant: PlantSummary;
+  height: number | null;
+  onHeight: (h: number | null) => void;
+  onUnplace: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="space-y-3 rounded-xl bg-stone-50 p-3 dark:bg-stone-800/50">
+      <div className="flex items-baseline justify-between gap-2">
+        <a href={`/plants/${plant.id}`} className="font-medium hover:underline">{plant.name}</a>
+        {plant.species && <span className="truncate text-xs text-stone-500 italic">{plant.species}</span>}
+      </div>
+      <HeightField value={height} onChange={onHeight} />
+      <div className="flex flex-wrap gap-2">
+        <button className="btn-ghost px-2.5 py-1 text-xs" onClick={onUnplace}>Von Karte nehmen</button>
+        <button className="btn-danger ml-auto px-2.5 py-1 text-xs" onClick={onDelete}>Pflanze löschen</button>
+      </div>
+    </div>
+  );
+}
+
+function NewPlantPanel({
+  species,
+  onCreate,
+  onCancel,
+}: {
+  species: Species[];
+  onCreate: (name: string, speciesId: string | null, h: number | null) => Promise<string | null>;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [sp, setSp] = useState<Species | null>(null);
+  const [h, setH] = useState<number | null>(0);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <div className="space-y-3 rounded-xl bg-stone-50 p-3 dark:bg-stone-800/50">
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label>
+          <span className="label">Art</span>
+          <SpeciesSelect
+            species={species}
+            value={sp?.id ?? null}
+            onChange={(s) => {
+              setSp(s);
+              if (s && !name) setName(s.common_name_de);
+            }}
+          />
+        </label>
+        <label>
+          <span className="label">Name</span>
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="z. B. Efeutute Regal" />
+        </label>
+      </div>
+      <HeightField value={h} onChange={setH} />
+      <p className="text-xs text-stone-500">Wird sofort angelegt und in die Raummitte gesetzt – danach an die richtige Stelle ziehen.</p>
+      <div className="flex gap-2">
+        <button className="btn" disabled={pending} onClick={() => start(async () => setError(await onCreate(name, sp?.id ?? null, h)))}>
+          {pending ? "Lege an…" : "Pflanze anlegen"}
+        </button>
+        <button className="btn-ghost" onClick={onCancel}>Abbrechen</button>
+      </div>
+      {error && <p className="text-xs text-rose-600">{error}</p>}
+    </div>
+  );
+}
+
 function SelectedPanel({
   plan,
   selected,
@@ -286,7 +481,7 @@ function SelectedPanel({
   onRemove,
 }: {
   plan: FloorPlan;
-  selected: NonNullable<Selection>;
+  selected: Exclude<NonNullable<Selection>, { kind: "plant" }>;
   onChange: (p: FloorPlan) => void;
   onRemove: () => void;
 }) {

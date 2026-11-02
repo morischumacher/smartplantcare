@@ -11,9 +11,29 @@ import type { FloorPlan, PlantSummary } from "@/lib/types";
 // In edit mode, plants and furniture can be dragged and elements selected for removal.
 
 type Pos = { x: number; y: number };
-export type Selection = { kind: "feature" | "furniture"; index: number } | null;
+type PlantPos = Pos & { h?: number | null };
+export type Selection = { kind: "feature" | "furniture"; index: number } | { kind: "plant"; id: string } | null;
 
 const PAD = 0.45; // metres of margin around the room
+const STACK_M = 0.3; // pins closer than this share a spot (e.g. shelves of one cupboard)
+const STACK_GAP = 0.42;
+
+/** Spreads pins that stand at the same spot (stacked on shelves) side by side, highest first. */
+function spread<T extends { pos: PlantPos }>(entries: T[]): (T & { shown: Pos })[] {
+  const groups: T[][] = [];
+  for (const e of entries) {
+    const g = groups.find((g) => Math.hypot(g[0].pos.x - e.pos.x, g[0].pos.y - e.pos.y) < STACK_M);
+    if (g) g.push(e);
+    else groups.push([e]);
+  }
+  return groups.flatMap((g) =>
+    [...g]
+      .sort((a, b) => (b.pos.h ?? 0) - (a.pos.h ?? 0))
+      .map((e, i) => ({ ...e, shown: { x: e.pos.x + (i - (g.length - 1) / 2) * STACK_GAP, y: e.pos.y } })),
+  );
+}
+
+const heightLabel = (h: number | null | undefined) => (h && h >= 0.05 ? `${num(h, 1)} m` : null);
 
 type Props = {
   plan: FloorPlan;
@@ -21,7 +41,7 @@ type Props = {
   /** Detected plants not set up yet, drawn as dashed pins. */
   candidates?: { id: string; x: number; y: number; label: string }[];
   /** Overrides plant.map while editing. */
-  positions?: Record<string, Pos | null>;
+  positions?: Record<string, PlantPos | null>;
   editable?: boolean;
   compact?: boolean;
   selected?: Selection;
@@ -49,8 +69,9 @@ function inwardNormal(a: Pos, b: Pos, centre: Pos): Pos {
   return n.x * toCentre.x + n.y * toCentre.y >= 0 ? n : { x: -n.x, y: -n.y };
 }
 
-function nearby(pos: Pos, plan: FloorPlan) {
+function nearby(pos: PlantPos, plan: FloorPlan) {
   const notes: string[] = [];
+  if (heightLabel(pos.h)) notes.push(`Steht auf ${heightLabel(pos.h)} Höhe`);
   const nearest = (kind: string) =>
     Math.min(
       Infinity,
@@ -92,9 +113,11 @@ export function FloorPlanMap({
   const vb = { x: -PAD, y: -PAD, w: w + 2 * PAD, h: d + 2 * PAD };
   const fontSize = Math.max(0.13, Math.min(0.2, Math.max(w, d) / 28));
 
-  const placed = plants
-    .map((p) => ({ plant: p, pos: positions && p.id in positions ? positions[p.id] : p.map }))
-    .filter((e): e is { plant: PlantSummary; pos: Pos } => e.pos !== null && e.pos !== undefined);
+  const placed = spread(
+    plants
+      .map((p) => ({ plant: p, pos: positions && p.id in positions ? positions[p.id] : p.map }))
+      .filter((e): e is { plant: PlantSummary; pos: PlantPos } => e.pos !== null && e.pos !== undefined),
+  );
 
   function toRoom(e: React.PointerEvent): Pos {
     const svg = svgRef.current!;
@@ -297,22 +320,30 @@ export function FloorPlanMap({
         ))}
 
         {/* plants */}
-        {placed.map(({ plant, pos }) => {
+        {placed.map(({ plant, pos, shown: at }) => {
           const light = lightCategory(plant.light_peak_7d);
           const r = 0.17;
-          const isActive = shown === plant.id;
+          const isActive = shown === plant.id || (selected?.kind === "plant" && selected.id === plant.id);
+          const stacked = at.x !== pos.x;
+          const height = heightLabel(pos.h);
           return (
             <g
               key={plant.id}
-              transform={`translate(${pos.x} ${pos.y})`}
+              transform={`translate(${at.x} ${at.y})`}
               className={editable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}
               onPointerEnter={(e) => e.pointerType === "mouse" && setActive(plant.id)}
               onPointerDown={(e) => {
                 e.stopPropagation();
-                if (editable) startDrag(e, "plant", plant.id, 0, pos);
+                if (editable) {
+                  onSelect?.({ kind: "plant", id: plant.id });
+                  startDrag(e, "plant", plant.id, 0, pos);
+                }
                 else setPinned((cur) => (cur === plant.id ? null : plant.id));
               }}
             >
+              {stacked && (
+                <line x1={0} y1={0} x2={pos.x - at.x} y2={0} className="pointer-events-none stroke-stone-400" strokeWidth="0.015" strokeDasharray="0.04 0.03" />
+              )}
               {light && <circle r={0.22 + light.level * 0.13} fill={`url(#halo-${uid})`} className="pointer-events-none" />}
               {plant.status === "water_now" && (
                 <circle r={r} fill="none" stroke={STATUS.water_now.fill} strokeWidth="0.03">
@@ -346,6 +377,7 @@ export function FloorPlanMap({
                   strokeWidth={fontSize * 0.25}
                 >
                   {plant.name}
+                  {height && <tspan className="fill-stone-500 font-normal dark:fill-stone-400"> · {height}</tspan>}
                 </text>
               )}
             </g>
@@ -357,8 +389,8 @@ export function FloorPlanMap({
         <PlantTooltip
           plant={shownEntry.plant}
           notes={nearby(shownEntry.pos, plan)}
-          left={((shownEntry.pos.x - vb.x) / vb.w) * 100}
-          top={((shownEntry.pos.y - vb.y) / vb.h) * 100}
+          left={((shownEntry.shown.x - vb.x) / vb.w) * 100}
+          top={((shownEntry.shown.y - vb.y) / vb.h) * 100}
           onClose={() => setPinned(null)}
         />
       )}

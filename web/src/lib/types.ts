@@ -13,7 +13,8 @@ export interface PlantSummary {
   name: string;
   species: string | null;
   room_id: string | null;
-  map: { x: number; y: number } | null;
+  /** h: height above the floor in m (shelf, windowsill), null if unknown. */
+  map: { x: number; y: number; h: number | null } | null;
   moisture: number | null;
   temperature: number | null;
   light: number | null;
@@ -116,6 +117,7 @@ export interface Candidate {
   confidence: "high" | "medium" | "low";
   map_x: number | null;
   map_y: number | null;
+  map_height_m: number | null;
   box: Box | null;
   photo_url: string | null;
   closeup_url: string | null;
@@ -129,6 +131,7 @@ export interface CandidateSuggestion {
   confidence: "high" | "medium" | "low";
   map_x: number;
   map_y: number;
+  height_m: number;
   photo_path: string;
   box: Box;
 }

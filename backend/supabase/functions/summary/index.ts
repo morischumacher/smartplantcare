@@ -64,7 +64,7 @@ function climateStatus(humidity: number | null, min: number, max: number) {
 async function buildSummary(now: number) {
   const [rooms, plants, pots, links, latest, photos] = await Promise.all([
     query(supabase.from("rooms").select("id, name, humidity_min, humidity_max, floor_plan").order("name")),
-    query(supabase.from("plants").select("id, name, species, room_id, moisture_min, moisture_max, photo_interval_days, created_at, map_x, map_y").is("archived_at", null).order("name")),
+    query(supabase.from("plants").select("id, name, species, room_id, moisture_min, moisture_max, photo_interval_days, created_at, map_x, map_y, map_height_m").is("archived_at", null).order("name")),
     query(supabase.from("pots").select("plant_id, started_at, volume_l, soil_type").order("started_at", { ascending: false })),
     query(supabase.from("plant_sensors").select("plant_id, sensor_id")),
     query(supabase.from("sensor_latest").select("sensor_id, type, room_id, ts, moisture, temperature, light, conductivity, humidity")),
@@ -137,7 +137,9 @@ async function buildSummary(now: number) {
       name: plant.name,
       species: plant.species,
       room_id: plant.room_id,
-      map: plant.map_x === null ? null : { x: Number(plant.map_x), y: Number(plant.map_y) },
+      map: plant.map_x === null
+        ? null
+        : { x: Number(plant.map_x), y: Number(plant.map_y), h: plant.map_height_m === null ? null : Number(plant.map_height_m) },
       moisture: s.moisture,
       temperature: avg("temperature"),
       light: avg("light"),

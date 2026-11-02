@@ -148,7 +148,7 @@ export async function getCandidates(roomId: string): Promise<Candidate[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("plant_candidates")
-    .select("id, description, species_guess, species_id, confidence, map_x, map_y, box, photo_path, closeup_path, species(common_name_de)")
+    .select("id, description, species_guess, species_id, confidence, map_x, map_y, map_height_m, box, photo_path, closeup_path, species(common_name_de)")
     .eq("room_id", roomId)
     .eq("status", "open")
     .order("created_at");
@@ -163,6 +163,7 @@ export async function getCandidates(roomId: string): Promise<Candidate[]> {
     confidence: c.confidence,
     map_x: c.map_x === null ? null : Number(c.map_x),
     map_y: c.map_y === null ? null : Number(c.map_y),
+    map_height_m: c.map_height_m === null ? null : Number(c.map_height_m),
     box: c.box,
     photo_url: c.photo_path ? (urls.get(c.photo_path) ?? null) : null,
     closeup_url: c.closeup_path ? (urls.get(c.closeup_path) ?? null) : null,

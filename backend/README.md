@@ -89,8 +89,10 @@ Kosten: grob 1–2 Cent pro Foto (Anthropic-API-Guthaben nötig).
 ```
 POST /functions/v1/plan-room
 Authorization: Bearer <Access-Token des angemeldeten Nutzers>
-{ "room_id": "<rooms.id>" }
+{ "room_id": "<rooms.id>", "mode": "plan" }   // mode "plants": nur Pflanzen neu suchen, gespeicherter Grundriss bleibt
 ```
+
+Pflanzen haben eine Höhe über dem Boden (`plants.map_height_m`, die KI schätzt sie mit): Pflanzen übereinander in einem Regal stehen am selben Punkt, sind aber verschiedene Pflanzen. Abgelehnte Kandidaten werden nicht erneut vorgeschlagen.
 
 Claude zeichnet einen abstrakten Grundriss von oben (Umriss, Fenster, Türen, Heizkörper, große Möbel, alles in Metern) und verortet die Pflanzen. Eingaben:
 

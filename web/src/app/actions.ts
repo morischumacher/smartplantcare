@@ -112,6 +112,7 @@ export async function savePlant(_prev: ActionResult | null, fd: FormData): Promi
   if (!fields.name) return { ok: false, error: "Bitte einen Namen eingeben." };
   if (fields.moisture_min >= fields.moisture_max) return { ok: false, error: "Feuchte: Minimum muss kleiner als Maximum sein." };
   const sensorIds = fd.getAll("sensor_ids").map(String);
+  const photoPath = str(fd, "photo_path");
 
   let plantId = id;
   try {
@@ -132,6 +133,8 @@ export async function savePlant(_prev: ActionResult | null, fd: FormData): Promi
       });
       if (potError) throw potError;
     }
+    // photo used to identify the species becomes the first diary photo
+    if (photoPath) await supabase.from("plant_photos").insert({ plant_id: plantId, storage_path: photoPath, reason: "manual" });
     const { error: delError } = await supabase.from("plant_sensors").delete().eq("plant_id", plantId!);
     if (delError) throw delError;
     if (sensorIds.length > 0) {
@@ -152,6 +155,60 @@ export async function archivePlant(id: string) {
   const supabase = await createClient();
   await supabase.from("plants").update({ archived_at: new Date().toISOString() }).eq("id", id);
   redirect("/");
+}
+
+/** Deletes a plant with all its data (waterings, pots, photos, sensor links). */
+export async function deletePlant(id: string): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: photos } = await supabase.from("plant_photos").select("storage_path").eq("plant_id", id);
+    // closeups of accepted candidates are shared with the candidate row; removing the file is fine either way
+    if (photos?.length) await supabase.storage.from("plant-photos").remove(photos.map((p) => p.storage_path));
+    const { error } = await supabase.from("plants").delete().eq("id", id);
+    if (error) throw error;
+  } catch (e) {
+    return fail(e);
+  }
+  refresh();
+  return { ok: true, message: "Pflanze gelöscht" };
+}
+
+/** Creates a plant straight from the room map, with the species' care values as targets. */
+export async function createPlantOnMap(input: {
+  roomId: string;
+  name: string;
+  speciesId: string | null;
+  x: number;
+  y: number;
+  h: number | null;
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  if (!input.name.trim()) return { ok: false, error: "Bitte einen Namen eingeben." };
+  try {
+    const supabase = await createClient();
+    const sp = input.speciesId
+      ? ((await supabase.from("species").select("*").eq("id", input.speciesId).single()).data as Species | null)
+      : null;
+    const { data: plant, error } = await supabase
+      .from("plants")
+      .insert({
+        name: input.name.trim(),
+        species: sp?.common_name_de ?? null,
+        species_id: sp?.id ?? null,
+        room_id: input.roomId,
+        map_x: input.x,
+        map_y: input.y,
+        map_height_m: input.h,
+        ...(sp ? speciesTargets(sp) : {}),
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    await supabase.from("pots").insert({ plant_id: plant.id, soil_type: sp?.soil_type ?? "universal" });
+    refresh();
+    return { ok: true, id: plant.id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Fehler" };
+  }
 }
 
 export async function repot(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
@@ -275,7 +332,7 @@ export async function setRoomPhotos(roomId: string, paths: string[]): Promise<Ac
 
 export type PlanSuggestion = {
   floor_plan: FloorPlan;
-  plants: { plant_id: string; x: number; y: number; confidence: string }[];
+  plants: { plant_id: string; x: number; y: number; height_m: number; confidence: string }[];
   candidates: CandidateSuggestion[];
 };
 
@@ -287,10 +344,46 @@ export async function suggestFloorPlan(roomId: string): Promise<{ ok: true; sugg
   }
 }
 
+/** Searches the room photos for plants again, keeping the saved floor plan as it is. */
+export async function rescanPlants(roomId: string): Promise<ActionResult> {
+  try {
+    const r = await callFunction<PlanSuggestion>("plan-room", { body: { room_id: roomId, mode: "plants" } });
+    const supabase = await createClient();
+    await supabase.from("plant_candidates").delete().eq("room_id", roomId).eq("status", "open");
+    if (r.candidates.length > 0) {
+      const { error } = await supabase.from("plant_candidates").insert(
+        r.candidates.map((c) => ({
+          room_id: roomId,
+          photo_path: c.photo_path,
+          box: c.box,
+          description: c.description,
+          species_guess: c.species_guess,
+          species_id: c.species_id,
+          confidence: c.confidence,
+          map_x: c.map_x,
+          map_y: c.map_y,
+          map_height_m: c.height_m,
+        })),
+      );
+      if (error) throw error;
+    }
+    // plants that have no spot on the map yet get the one found on the photos
+    const { data: unplaced } = await supabase.from("plants").select("id").eq("room_id", roomId).is("map_x", null);
+    for (const p of r.plants.filter((p) => unplaced?.some((u) => u.id === p.plant_id))) {
+      await supabase.from("plants").update({ map_x: p.x, map_y: p.y, map_height_m: p.height_m }).eq("id", p.plant_id);
+    }
+    refresh();
+    const n = r.candidates.length;
+    return { ok: true, message: n === 0 ? "Keine neuen Pflanzen gefunden." : `${n} neue Pflanze(n) gefunden – unten prüfen und anlegen.` };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 export async function saveFloorPlan(input: {
   roomId: string;
   floorPlan: FloorPlan;
-  positions: { plantId: string; x: number | null; y: number | null }[];
+  positions: { plantId: string; x: number | null; y: number | null; h: number | null }[];
   /** Plants the AI spotted that are not set up yet; replaces the room's open candidates. */
   candidates?: CandidateSuggestion[];
 }): Promise<ActionResult> {
@@ -299,7 +392,7 @@ export async function saveFloorPlan(input: {
     const { error } = await supabase.from("rooms").update({ floor_plan: input.floorPlan }).eq("id", input.roomId);
     if (error) throw error;
     for (const p of input.positions) {
-      const { error: posError } = await supabase.from("plants").update({ map_x: p.x, map_y: p.y }).eq("id", p.plantId);
+      const { error: posError } = await supabase.from("plants").update({ map_x: p.x, map_y: p.y, map_height_m: p.h }).eq("id", p.plantId);
       if (posError) throw posError;
     }
     if (input.candidates) {
@@ -316,6 +409,7 @@ export async function saveFloorPlan(input: {
             confidence: c.confidence,
             map_x: c.map_x,
             map_y: c.map_y,
+            map_height_m: c.height_m,
           })),
         );
         if (candError) throw candError;
@@ -443,6 +537,25 @@ export async function saveSpecies(_prev: ActionResult | null, fd: FormData): Pro
   return { ok: true, message: "Gespeichert" };
 }
 
+/** Identifies the species on an uploaded photo; creates a species profile if it is missing. */
+export async function identifyPhoto(path: string): Promise<
+  { ok: true; species: Species | null; name: string | null; confidence: "high" | "medium" | "low"; reasoning: string } | { ok: false; error: string }
+> {
+  try {
+    const r = await callFunction<{
+      guess: string | null;
+      common_name_de?: string;
+      confidence: "high" | "medium" | "low";
+      reasoning: string;
+      species: Species | null;
+    }>("plant-species", { body: { action: "identify", photo_path: path } });
+    refresh();
+    return { ok: true, species: r.species, name: r.species?.common_name_de ?? r.common_name_de ?? r.guess, confidence: r.confidence, reasoning: r.reasoning };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Fehler" };
+  }
+}
+
 /** Takes a close-up of a detected plant and lets Claude identify the species. */
 export async function identifyCandidate(candidateId: string, closeupPath: string): Promise<ActionResult> {
   try {
@@ -487,6 +600,7 @@ export async function acceptCandidate(input: { candidateId: string; name: string
         room_id: c.room_id,
         map_x: c.map_x,
         map_y: c.map_y,
+        map_height_m: c.map_height_m,
         ...(sp ? speciesTargets(sp) : {}),
       })
       .select("id")
