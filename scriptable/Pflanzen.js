@@ -21,6 +21,11 @@ const STATUS = {
   no_data: { label: "Keine Daten", color: new Color("#a8a29e"), symbol: "wifi.slash" },
   ok: { label: "Gut", color: new Color("#10b981"), symbol: "leaf.fill" },
 };
+const ALERT = {
+  critical: new Color("#e11d48"),
+  warning: new Color("#f59e0b"),
+  symbol: { humidity: "humidity.fill", temperature: "thermometer.medium" },
+};
 const TEXT = Color.dynamic(new Color("#1c1917"), new Color("#f5f5f4"));
 const MUTED = Color.dynamic(new Color("#78716c"), new Color("#a8a29e"));
 const BG = Color.dynamic(new Color("#f0fdf4"), new Color("#0c1a13"));
@@ -90,12 +95,21 @@ function until(iso) {
 
 const moisture = (p) => (p.moisture === null ? "–" : `${p.moisture} %`);
 const urgent = (data) => data.plants.filter((p) => p.status === "water_now" || p.status === "water_soon");
+// climate alerts come from the backend (older responses have none)
+const alerts = (data) => data.alerts ?? [];
+const alertTitle = (a) => `${a.room}: ${a.message.split(" (")[0]}`;
+/** water now and climate alerts – what the number on small and lock-screen widgets counts */
+const todo = (data) => data.attention + alerts(data).length;
 
+/** Most urgent first: water now, climate, water soon. */
 function headline(data) {
   const now = data.plants.filter((p) => p.status === "water_now").length;
   if (now > 0) return now === 1 ? "1 Pflanze gießen" : `${now} Pflanzen gießen`;
+  const a = alerts(data)[0];
+  if (a) return alertTitle(a);
   const soon = data.plants.filter((p) => p.status === "water_soon").length;
   if (soon > 0) return soon === 1 ? "1 Pflanze bald" : `${soon} Pflanzen bald`;
+  if (data.plants.length > 0 && data.plants.every((p) => p.status === "no_data")) return "Keine Sensordaten";
   return "Alles gut";
 }
 
@@ -129,6 +143,17 @@ function plantRow(stack, p, size) {
   text(row, detail, size - 1, { color: MUTED });
 }
 
+function alertRow(stack, a, size) {
+  const row = stack.addStack();
+  row.layoutHorizontally();
+  row.centerAlignContent();
+  row.spacing = 6;
+  symbol(ALERT.symbol[a.kind] ?? "exclamationmark.triangle.fill", size, ALERT[a.severity] ?? ALERT.warning, row);
+  text(row, a.room, size, { bold: a.severity === "critical" });
+  row.addSpacer();
+  text(row, a.message, size - 1, { color: MUTED });
+}
+
 function footer(w, data, stale) {
   w.addSpacer();
   const f = text(w, `${stale ? "⚠︎ offline · " : ""}${ago(data.generated_at)}`, 9, { color: MUTED });
@@ -137,14 +162,21 @@ function footer(w, data, stale) {
 
 function small(w, data, stale) {
   const top = urgent(data)[0] ?? data.plants[0];
+  const alert = alerts(data)[0];
+  // a climate alert outranks "water soon", not "water now"
+  const showAlert = alert && top?.status !== "water_now";
   const head = w.addStack();
   head.centerAlignContent();
-  symbol(top ? STATUS[top.status].symbol : "leaf.fill", 16, top ? STATUS[top.status].color : STATUS.ok.color, head);
+  if (showAlert) symbol(ALERT.symbol[alert.kind], 16, ALERT[alert.severity], head);
+  else symbol(top ? STATUS[top.status].symbol : "leaf.fill", 16, top ? STATUS[top.status].color : STATUS.ok.color, head);
   head.addSpacer();
-  text(head, String(data.attention), 22, { bold: true, color: data.attention > 0 ? STATUS.water_now.color : MUTED });
+  text(head, String(todo(data)), 22, { bold: true, color: todo(data) > 0 ? STATUS.water_now.color : MUTED });
   w.addSpacer(6);
   text(w, headline(data), 14, { bold: true, lines: 2 });
-  if (top && top.status !== "ok") {
+  if (showAlert) {
+    w.addSpacer(2);
+    text(w, alert.message, 11, { color: MUTED, lines: 2 });
+  } else if (top && top.status !== "ok" && top.status !== "no_data") {
     w.addSpacer(2);
     text(w, `${top.name} · ${moisture(top)}`, 11, { color: MUTED });
     if (top.ml) text(w, `${top.ml} ml`, 11, { color: MUTED });
@@ -163,11 +195,15 @@ function list(w, data, stale, max) {
   const room = data.rooms.find((r) => r.humidity !== null);
   if (room) text(head, `${room.name} ${room.humidity} %`, 10, { color: MUTED });
   w.addSpacer(6);
-  for (const p of data.plants.slice(0, max)) {
-    plantRow(w, p, 12);
+  // rows: water now, climate alerts, then the rest of the plants
+  const now = data.plants.filter((p) => p.status === "water_now");
+  const rest = data.plants.filter((p) => p.status !== "water_now");
+  const rows = [...now.map((p) => [plantRow, p]), ...alerts(data).map((a) => [alertRow, a]), ...rest.map((p) => [plantRow, p])];
+  for (const [draw, item] of rows.slice(0, max)) {
+    draw(w, item, 12);
     w.addSpacer(3);
   }
-  if (data.plants.length > max) text(w, `+ ${data.plants.length - max} weitere`, 10, { color: MUTED });
+  if (rows.length > max) text(w, `+ ${rows.length - max} weitere`, 10, { color: MUTED });
   footer(w, data, stale);
 }
 
@@ -183,13 +219,18 @@ function lockScreen(w, data, family) {
     s.layoutVertically();
     s.centerAlignContent();
     symbol(now > 0 ? "drop.fill" : "leaf.fill", 14, Color.white(), s);
-    text(s, String(data.attention), 16, { bold: true, color: Color.white() });
+    text(s, String(todo(data)), 16, { bold: true, color: Color.white() });
     return;
   }
   // accessoryRectangular
   text(w, headline(data), 13, { bold: true, color: Color.white() });
-  for (const p of urgent(data).slice(0, 2)) text(w, `${p.name} · ${moisture(p)}`, 11, { color: Color.white() });
-  if (urgent(data).length === 0) text(w, `${data.plants.length} Pflanzen im grünen Bereich`, 11, { color: Color.white() });
+  const lines = [
+    ...data.plants.filter((p) => p.status === "water_now").map((p) => `${p.name} · ${moisture(p)}`),
+    ...alerts(data).map(alertTitle),
+    ...data.plants.filter((p) => p.status === "water_soon").map((p) => `${p.name} · ${moisture(p)}`),
+  ].filter((l) => l !== headline(data));
+  for (const l of lines.slice(0, 2)) text(w, l, 11, { color: Color.white() });
+  if (lines.length === 0 && headline(data) === "Alles gut") text(w, `${data.plants.length} Pflanzen im grünen Bereich`, 11, { color: Color.white() });
 }
 
 function build(family, { data, stale, error }) {

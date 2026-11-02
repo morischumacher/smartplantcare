@@ -2,7 +2,8 @@ import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.WatchUi;
 
-// Glance in the widget loop: "2 Pflanzen gießen" and the most urgent plant with its moisture.
+// Glance in the widget loop: "2 Pflanzen gießen" and the most urgent plant with its moisture,
+// or a climate alert ("Wohnzimmer: Luft zu trocken" and what to do).
 (:glance)
 class PlantsGlance extends WatchUi.GlanceView {
     function initialize() {
@@ -20,7 +21,7 @@ class PlantsGlance extends WatchUi.GlanceView {
         if (list.size() > 0) {
             var top = list[0] as Dictionary;
             var status = top["status"] as String;
-            var line = status.equals("ok") ? list.size() + " Pflanzen im grünen Bereich" : top["name"] + " · " + PlantsData.moisture(top);
+            var line = status.equals("ok") ? list.size() + " Pflanzen im grünen Bereich" : PlantsData.isAlert(top) ? PlantsData.detail(top) : top["name"] + " · " + PlantsData.detail(top);
             dc.setColor(PlantsData.color(status), Graphics.COLOR_TRANSPARENT);
             dc.fillCircle(5, h * 3 / 4, 5);
             dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);

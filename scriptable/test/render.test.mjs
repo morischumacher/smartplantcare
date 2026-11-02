@@ -95,3 +95,24 @@ test("all ok: no alarm", async () => {
   const { texts } = await run({ family: "small", response: calm });
   assert.match(texts.join(" | "), /Alles gut.*Nächstes Gießen morgen/);
 });
+
+const dry = { room: "Wohnzimmer", kind: "humidity", severity: "warning", message: "Luft zu trocken (31 %) – befeuchten" };
+
+test("climate alert: listed after water-now plants, headline when nothing needs water now", async () => {
+  const withAlert = { ...sample, alerts: [dry] };
+  const { texts } = await run({ family: "medium", response: withAlert });
+  assert.match(texts.join(" | "), /1 Pflanze gießen.*Efeutute.*Wohnzimmer \| Luft zu trocken \(31 %\) – befeuchten.*Ufopflanze/);
+
+  const noWater = { ...withAlert, plants: sample.plants.filter((p) => p.status !== "water_now") };
+  for (const family of ["small", "accessoryRectangular", "accessoryInline"]) {
+    const out = (await run({ family, response: noWater })).texts.join(" | ");
+    assert.match(out, /Wohnzimmer: Luft zu trocken/, family);
+  }
+});
+
+test("no sensor data: says so instead of 'Alles gut'", async () => {
+  const empty = { ...sample, attention: 0, plants: sample.plants.map((p) => ({ ...p, status: "no_data", moisture: null })) };
+  const { texts } = await run({ family: "medium", response: empty });
+  assert.match(texts.join(" | "), /Keine Sensordaten/);
+  assert.doesNotMatch(texts.join(" | "), /Alles gut/);
+});

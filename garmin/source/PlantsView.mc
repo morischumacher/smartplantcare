@@ -4,7 +4,8 @@ import Toybox.Lang;
 import Toybox.Time;
 import Toybox.WatchUi;
 
-// Detail view when the glance is opened: list of plants with status dot, moisture and amount.
+// Detail view when the glance is opened: list of plants with status dot, moisture and amount;
+// climate alerts as rows with the room and what to do.
 // Up/down scrolls, Start refreshes.
 class PlantsView extends WatchUi.View {
     const ROWS = 4;
@@ -69,7 +70,7 @@ class PlantsView extends WatchUi.View {
             dc.fillCircle(w * 0.16, y, 7);
             dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
             dc.drawText(w * 0.22, y - rowH * 0.18, Graphics.FONT_XTINY, p["name"] as String, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-            var detail = PlantsData.moisture(p);
+            var detail = PlantsData.detail(p);
             if (status.equals("water_now") && p["ml"] != null) {
                 detail = detail + " · " + (p["ml"] as Number).format("%d") + " ml";
             }

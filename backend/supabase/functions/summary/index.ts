@@ -10,6 +10,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { secretsMatch } from "../ingest/validate.ts";
+import { climateAlerts } from "../_shared/climate.ts";
 import { compactSummary } from "../_shared/compact.ts";
 import { type HourPoint, type PlantInput, type PlantSummary, type Pot, type PotPeriod, summarize } from "../_shared/watering.ts";
 
@@ -66,7 +67,7 @@ function climateStatus(humidity: number | null, min: number, max: number) {
 async function buildSummary(now: number) {
   const [rooms, plants, pots, links, latest, photos] = await Promise.all([
     query(supabase.from("rooms").select("id, name, humidity_min, humidity_max, floor_plan").order("name")),
-    query(supabase.from("plants").select("id, name, species, room_id, moisture_min, moisture_max, photo_interval_days, created_at, map_x, map_y, map_height_m").is("archived_at", null).order("name")),
+    query(supabase.from("plants").select("id, name, species, room_id, moisture_min, moisture_max, temp_min_c, temp_max_c, photo_interval_days, created_at, map_x, map_y, map_height_m").is("archived_at", null).order("name")),
     query(supabase.from("pots").select("plant_id, started_at, volume_l, soil_type").order("started_at", { ascending: false })),
     query(supabase.from("plant_sensors").select("plant_id, sensor_id")),
     query(supabase.from("sensor_latest").select("sensor_id, type, room_id, ts, moisture, temperature, light, conductivity, humidity")),
@@ -148,6 +149,7 @@ async function buildSummary(now: number) {
       conductivity: avg("conductivity"),
       light_peak_7d: dailyPeakLight(hourly, now),
       target: { min: input.moisture_min, max: input.moisture_max },
+      temp_target: { min: num(plant.temp_min_c), max: num(plant.temp_max_c) },
       status: s.status,
       recommended_ml: s.recommended_ml,
       next_watering_at: iso(s.next_watering_at),
@@ -163,7 +165,13 @@ async function buildSummary(now: number) {
   type RoomEntry = {
     id: string | null;
     name: string;
-    climate: { temperature: number | null; humidity: number | null; status: string; [k: string]: unknown } | null;
+    climate: {
+      temperature: number | null;
+      humidity: number | null;
+      status: string;
+      target: { min: number; max: number };
+      [k: string]: unknown;
+    } | null;
     floor_plan: unknown;
     plants: typeof plantSummaries;
   };
@@ -187,8 +195,21 @@ async function buildSummary(now: number) {
   const unassigned = plantSummaries.filter((p) => !p.room_id || !rooms.some((r) => r.id === p.room_id));
   if (unassigned.length > 0) roomEntries.push({ id: null, name: "Ohne Raum", climate: null, floor_plan: null, plants: unassigned });
 
+  const alerts = climateAlerts(roomEntries.filter((r) => r.climate).map((r) => {
+    const temps = r.plants.map((p) => p.temperature).filter((v): v is number => v !== null);
+    return {
+      name: r.name,
+      humidity: r.climate!.humidity,
+      humidity_min: Number(r.climate!.target.min),
+      humidity_max: Number(r.climate!.target.max),
+      temperature: r.climate!.temperature ?? (temps.length ? temps.reduce((s, v) => s + v, 0) / temps.length : null),
+      plant_targets: r.plants.map((p) => ({ temp_min_c: p.temp_target.min, temp_max_c: p.temp_target.max })),
+    };
+  }));
+
   return {
     generated_at: iso(now),
+    alerts,
     attention: plantSummaries.filter((p) => p.status === "water_now" || p.status === "water_soon").length,
     rooms: roomEntries,
   };

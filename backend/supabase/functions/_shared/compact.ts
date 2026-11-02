@@ -1,6 +1,8 @@
 // Slim summary for small clients (Scriptable widget, Garmin): no floor plans, learning details or
 // hint lists – a Garmin background service has only a few KB for the response. Pure logic.
 
+import type { ClimateAlert } from "./climate.ts";
+
 export interface FullPlant {
   name: string;
   status: string;
@@ -18,8 +20,9 @@ export interface FullRoom {
 
 const STATUS_ORDER: Record<string, number> = { water_now: 0, water_soon: 1, no_data: 2, ok: 3 };
 const MAX_PLANTS = 20;
+const MAX_ALERTS = 5;
 
-export function compactSummary(full: { generated_at: string | null; attention: number; rooms: FullRoom[] }) {
+export function compactSummary(full: { generated_at: string | null; attention: number; alerts: ClimateAlert[]; rooms: FullRoom[] }) {
   const plants = full.rooms
     .flatMap((r) =>
       r.plants.map((p) => ({
@@ -38,6 +41,8 @@ export function compactSummary(full: { generated_at: string | null; attention: n
   return {
     generated_at: full.generated_at,
     attention: full.attention,
+    // climate alerts, critical first; the clients show them between "water now" and "water soon"
+    alerts: full.alerts.slice(0, MAX_ALERTS).map((a) => ({ room: a.room, kind: a.kind, severity: a.severity, message: a.message })),
     plants,
     rooms: full.rooms
       .filter((r) => r.climate)

@@ -84,4 +84,4 @@ npm run build && npm run lint && npm test   # test: IFC-Umrechnung (src/lib/*.te
 - [x] Schritt 4: Web-App – live auf https://smartplantcare-umber.vercel.app (Vercel-Projekt `smartplantcare`, Root `web`, Deploy bei Push auf `main`)
 - [ ] Schritt 5: ntfy
 - [ ] Schritt 6: Scriptable – Widget fertig und getestet (`node --test scriptable/test/`), Einrichtung am iPhone steht aus
-- [ ] Schritt 7: Garmin – Code geschrieben, aber noch nie kompiliert (SDK fehlt hier); Build im Simulator steht aus
+- [ ] Schritt 7: Garmin – baut für `fr165`/`fr165m`, Liste im Simulator geprüft; Glance-Hintergrundabruf und Sideload auf die Uhr stehen aus
