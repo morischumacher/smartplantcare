@@ -81,7 +81,7 @@ npm run build && npm run lint && npm test   # test: IFC-Umrechnung (src/lib/*.te
 - [x] Schritt 1: Schema + `ingest`
 - [ ] Schritt 2: ESPHome auf dem Atom Lite – Firmware fertig und kompiliert, Test mit echter Hardware steht aus
 - [x] Schritt 3: `summary` + Gieß-Logik (Lernen, Umtopfen, Gießen erkennen), Foto-Tagebuch + KI-Check (`analyze-photo`)
-- [ ] Schritt 4: Web-App – gebaut (Übersicht, Pflanze, Tagebuch, Raumkarte mit KI-Grundriss, LiDAR-Scan und Pflanzenerkennung, Artendatenbank, Einstellungen), Deploy auf Vercel steht aus
+- [x] Schritt 4: Web-App – live auf https://smartplantcare-umber.vercel.app (Vercel-Projekt `smartplantcare`, Root `web`, Deploy bei Push auf `main`)
 - [ ] Schritt 5: ntfy
 - [ ] Schritt 6: Scriptable – Widget fertig und getestet (`node --test scriptable/test/`), Einrichtung am iPhone steht aus
 - [ ] Schritt 7: Garmin – Code geschrieben, aber noch nie kompiliert (SDK fehlt hier); Build im Simulator steht aus

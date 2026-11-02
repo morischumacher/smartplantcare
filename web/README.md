@@ -30,4 +30,4 @@ npm run dev
 
 ## Vercel
 
-Projekt aus dem GitHub-Repo importieren, **Root Directory** `web`, Umgebungsvariablen `NEXT_PUBLIC_SUPABASE_URL` und `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` setzen.
+Live unter **https://smartplantcare-umber.vercel.app**. Vercel-Projekt `smartplantcare` (Konto moritz-schumachers-projects), mit dem GitHub-Repo verbunden: jeder Push auf `main` wird deployt. **Root Directory** `web`, Umgebungsvariablen `NEXT_PUBLIC_SUPABASE_URL` und `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (Production, Preview, Development). `web-ifc.wasm` kopiert das `postinstall`-Skript beim Build nach `public/`.
