@@ -37,3 +37,13 @@ cd garmin && JAVA_HOME=~/.garmin/jdk/Contents/Home "$(ls -d ~/Library/Applicatio
 Im Simulator laden: `connectiq` starten, dann `monkeydo bin/Pflanzen-fr165m.prg fr165m` (beides im `bin/` des SDK).
 
 Die Uhr per USB anschließen und `bin/Pflanzen.prg` nach `GARMIN/APPS/` kopieren (am Mac mit [OpenMTP](https://openmtp.ganeshrvel.com/), da die Uhr als MTP-Gerät erscheint). Danach im Widget-Loop „Pflanzen“ hinzufügen.
+
+## Auf die Uhr (Beta-App)
+
+USB-Sideload per OpenMTP findet die Uhr am Mac nicht. Stattdessen läuft die App als private Beta im Connect IQ Store (nur für das eigene Garmin-Konto sichtbar):
+
+```bash
+cd garmin && JAVA_HOME=~/.garmin/jdk/Contents/Home "$(ls -d ~/Library/Application\ Support/Garmin/ConnectIQ/Sdks/*/ | tail -1)bin/monkeyc" -e -r -f monkey.jungle -o bin/Pflanzen.iq -y ~/.garmin/developer_key.der -l 2
+```
+
+`bin/Pflanzen.iq` im Entwickler-Dashboard ([apps-developer.garmin.com](https://apps-developer.garmin.com/)) bei der Beta-App „Pflanzen“ über „Neue Version hochladen“ einspielen; die Uhr holt sie über Connect IQ / Garmin Connect auf dem iPhone. Titelbild für den Store: `store/titelbild-500.png`.
