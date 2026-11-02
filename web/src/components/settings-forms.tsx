@@ -1,5 +1,6 @@
 "use client";
 
+import { ConfirmButton } from "@/components/confirm-button";
 import { useActionState, useTransition } from "react";
 import { addVacation, deleteRoom, deleteSensor, deleteVacation, saveRoom, saveSensor } from "@/app/actions";
 import { FormStatus } from "@/components/form-status";
@@ -42,14 +43,13 @@ export function RoomForm({
       <div className="flex gap-1">
         <button className="btn" disabled={pending}>{room ? "Speichern" : "Anlegen"}</button>
         {room && (
-          <button
-            type="button"
-            className="btn-danger"
+          <ConfirmButton
             disabled={deleting}
-            onClick={() => confirm(`Raum „${room.name}“ löschen? Pflanzen bleiben erhalten.`) && start(async () => void (await deleteRoom(room.id)))}
+            question={`Raum „${room.name}“ löschen? Pflanzen bleiben erhalten.`}
+            onConfirm={() => start(async () => void (await deleteRoom(room.id)))}
           >
             Löschen
-          </button>
+          </ConfirmButton>
         )}
       </div>
       <div className="sm:col-span-5"><FormStatus state={state} /></div>
@@ -78,14 +78,13 @@ export function SensorForm({ sensor, rooms }: { sensor: { id: string; name: stri
       )}
       {sensor.type !== "hygrometer" && <input type="hidden" name="room_id" value={sensor.room_id ?? ""} />}
       <button className="btn-ghost" disabled={pending}>Speichern</button>
-      <button
-        type="button"
-        className="btn-danger"
+      <ConfirmButton
         disabled={deleting}
-        onClick={() => confirm("Sensor samt allen Messwerten löschen?") && start(async () => void (await deleteSensor(sensor.id)))}
+        question="Sensor samt allen Messwerten löschen?"
+        onConfirm={() => start(async () => void (await deleteSensor(sensor.id)))}
       >
         Löschen
-      </button>
+      </ConfirmButton>
       <FormStatus state={state} />
     </form>
   );

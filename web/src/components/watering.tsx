@@ -1,5 +1,6 @@
 "use client";
 
+import { ConfirmButton } from "@/components/confirm-button";
 import { useState, useTransition } from "react";
 import { deleteWatering, logWatering, type ActionResult } from "@/app/actions";
 import { FormStatus } from "@/components/form-status";
@@ -105,13 +106,16 @@ export function WateringHistory({ items }: { items: { id: string; ts: string; am
           <span className="font-medium tabular-nums">{num(w.amount_ml)} ml</span>
           {w.source === "detected" && <span className="rounded-full bg-sky-100 px-2 text-xs text-sky-800 dark:bg-sky-500/20 dark:text-sky-200">erkannt</span>}
           {w.during_vacation && <span className="rounded-full bg-stone-100 px-2 text-xs dark:bg-stone-800">Urlaub</span>}
-          <button
-            className="ml-auto text-xs text-stone-400 hover:text-rose-600"
-            disabled={pending}
-            onClick={() => confirm("Eintrag löschen?") && start(async () => void (await deleteWatering(w.id)))}
-          >
-            Löschen
-          </button>
+          <span className="ml-auto">
+            <ConfirmButton
+              className="text-xs text-stone-400 hover:text-rose-600"
+              disabled={pending}
+              question="Eintrag löschen?"
+              onConfirm={() => start(async () => void (await deleteWatering(w.id)))}
+            >
+              Löschen
+            </ConfirmButton>
+          </span>
         </li>
       ))}
     </ul>

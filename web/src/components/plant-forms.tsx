@@ -1,5 +1,6 @@
 "use client";
 
+import { ConfirmButton } from "@/components/confirm-button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useRef, useState, useTransition } from "react";
@@ -74,6 +75,9 @@ export function PlantForm({
   const [found, setFound] = useState<Species | null>(null);
   const list = found && !species.some((s) => s.id === found.id) ? [found, ...species] : species;
   const picked = list.find((s) => s.id === speciesId) ?? null;
+  // editing an existing plant: species targets are offered, not applied silently over its own values
+  const [offer, setOffer] = useState<Species | null>(null);
+  const choose = (sp: Species) => (plant ? setOffer(sp) : apply(sp));
 
   function apply(sp: Species) {
     const el = form.current!.elements as unknown as Record<string, HTMLInputElement | HTMLSelectElement | undefined>;
@@ -95,7 +99,8 @@ export function PlantForm({
             value={speciesId}
             onChange={(sp) => {
               setSpeciesId(sp?.id ?? null);
-              if (sp && (!plant || confirm(`Zielwerte von „${sp.common_name_de}“ übernehmen?`))) apply(sp);
+              setOffer(null);
+              if (sp) choose(sp);
             }}
           />
           <FromPhoto
@@ -108,9 +113,21 @@ export function PlantForm({
               }
               setFound(sp);
               setSpeciesId(sp.id);
-              if (!plant || confirm(`Zielwerte von „${sp.common_name_de}“ übernehmen?`)) apply(sp);
+              choose(sp);
             }}
           />
+          {offer && (
+            <button
+              type="button"
+              className="btn-ghost w-full text-xs"
+              onClick={() => {
+                apply(offer);
+                setOffer(null);
+              }}
+            >
+              Zielwerte von „{offer.common_name_de}“ übernehmen
+            </button>
+          )}
           <p className="text-xs text-stone-500">
             Übernimmt Feuchte, Licht und Temperatur als Startwerte. Art fehlt? Unter <Link className="underline" href="/species">Arten</Link> von der KI anlegen lassen.
           </p>
@@ -209,20 +226,20 @@ export function DeletePlantButton({ plantId, name }: { plantId: string; name: st
   const [error, setError] = useState<string | null>(null);
   return (
     <>
-      <button
+      <ConfirmButton
         className="btn-danger border border-rose-200 dark:border-rose-900"
         disabled={pending}
-        onClick={() => {
-          if (!confirm(`„${name}“ mit Gießdaten, Töpfen und Fotos endgültig löschen?`)) return;
+        question={`„${name}“ endgültig löschen?`}
+        onConfirm={() =>
           start(async () => {
             const res = await deletePlant(plantId);
             if (res.ok) router.push("/");
             else setError(res.error);
-          });
-        }}
+          })
+        }
       >
         {pending ? "Lösche…" : "Pflanze löschen"}
-      </button>
+      </ConfirmButton>
       {error && <p className="mt-2 text-xs text-rose-600">{error}</p>}
     </>
   );

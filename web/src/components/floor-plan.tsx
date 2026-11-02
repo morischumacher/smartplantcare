@@ -18,7 +18,7 @@ const PAD = 0.45; // metres of margin around the room
 const STACK_M = 0.3; // pins closer than this share a spot (e.g. shelves of one cupboard)
 const STACK_GAP = 0.42;
 
-/** Spreads pins that stand at the same spot (stacked on shelves) side by side, highest first. */
+/** Spreads pins that stand at the same spot (stacked on shelves) into a column, highest on top. */
 function spread<T extends { pos: PlantPos }>(entries: T[]): (T & { shown: Pos })[] {
   const groups: T[][] = [];
   for (const e of entries) {
@@ -29,7 +29,7 @@ function spread<T extends { pos: PlantPos }>(entries: T[]): (T & { shown: Pos })
   return groups.flatMap((g) =>
     [...g]
       .sort((a, b) => (b.pos.h ?? 0) - (a.pos.h ?? 0))
-      .map((e, i) => ({ ...e, shown: { x: e.pos.x + (i - (g.length - 1) / 2) * STACK_GAP, y: e.pos.y } })),
+      .map((e, i) => ({ ...e, shown: { x: e.pos.x, y: e.pos.y + (i - (g.length - 1) / 2) * STACK_GAP } })),
   );
 }
 
@@ -331,8 +331,11 @@ export function FloorPlanMap({
           const light = lightCategory(plant.light_peak_7d);
           const r = 0.17;
           const isActive = shown === plant.id || (selected?.kind === "plant" && selected.id === plant.id);
-          const stacked = at.x !== pos.x;
+          const stacked = at.y !== pos.y;
           const height = heightLabel(pos.h);
+          const label = height ? `${plant.name} · ${height}` : plant.name;
+          // stacked pins: label beside the pin, towards the room's middle
+          const side = at.x > w / 2 ? { textAnchor: "end" as const, x: -(r + 0.07) } : { textAnchor: "start" as const, x: r + 0.07 };
           return (
             <g
               key={plant.id}
@@ -349,7 +352,7 @@ export function FloorPlanMap({
               }}
             >
               {stacked && (
-                <line x1={0} y1={0} x2={pos.x - at.x} y2={0} className="pointer-events-none stroke-stone-400" strokeWidth="0.015" strokeDasharray="0.04 0.03" />
+                <line x1={0} y1={0} x2={0} y2={pos.y - at.y} className="pointer-events-none stroke-stone-400" strokeWidth="0.015" strokeDasharray="0.04 0.03" />
               )}
               {light && <circle r={0.22 + light.level * 0.13} fill={`url(#halo-${uid})`} className="pointer-events-none" />}
               {plant.status === "water_now" && (
@@ -375,9 +378,9 @@ export function FloorPlanMap({
               />
               {!compact && (
                 <text
-                  y={r + fontSize * 0.95}
+                  y={stacked ? fontSize * 0.35 : r + fontSize * 0.95}
                   fontSize={fontSize}
-                  {...labelAt(at.x, height ? `${plant.name} · ${height}` : plant.name, fontSize)}
+                  {...(stacked ? side : labelAt(at.x, label, fontSize))}
                   className="pointer-events-none fill-stone-700 font-medium dark:fill-stone-200"
                   style={{ paintOrder: "stroke" }}
                   stroke="var(--halo-text, #ecfdf5)"

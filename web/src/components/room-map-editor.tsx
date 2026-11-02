@@ -1,5 +1,6 @@
 "use client";
 
+import { ConfirmButton } from "@/components/confirm-button";
 import { useRef, useState, useTransition } from "react";
 import {
   createPlantOnMap,
@@ -103,6 +104,15 @@ export function RoomMapEditor({
   const editing = draft !== null;
   const shown = draft ?? plan;
 
+  /** Puts an unplaced plant in the middle of the room and selects it, opening the editor if needed. */
+  function place(p: PlantSummary) {
+    const base = draft ?? plan;
+    if (!base) return;
+    if (!draft) edit(base);
+    setPositions((cur) => ({ ...cur, [p.id]: { x: r2(base.width_m / 2), y: r2(base.depth_m / 2), h: null } }));
+    setSelected({ kind: "plant", id: p.id });
+  }
+
   function edit(p: FloorPlan) {
     setDraft(structuredClone(p));
     setPositions(initialPositions());
@@ -186,6 +196,18 @@ export function RoomMapEditor({
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       <div className="space-y-3">
+        {!editing && plan && unplaced.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-500/30 dark:bg-amber-500/10">
+            <span className="text-amber-900 dark:text-amber-100">
+              {unplaced.length === 1 ? "Noch nicht auf der Karte:" : `${unplaced.length} Pflanzen noch nicht auf der Karte:`}
+            </span>
+            {unplaced.map((p) => (
+              <button key={p.id} className="rounded-full bg-white px-2.5 py-1 text-xs font-medium shadow-sm hover:bg-emerald-50 dark:bg-stone-800" onClick={() => place(p)}>
+                + {p.name} platzieren
+              </button>
+            ))}
+          </div>
+        )}
         <div className="card overflow-hidden p-3 sm:p-5">
           {shown ? (
             <FloorPlanMap
@@ -228,7 +250,10 @@ export function RoomMapEditor({
 
         {editing && (
           <div className="card space-y-3 p-4 text-sm">
-            <p className="text-stone-500">Pflanzen und Möbel ziehen, Elemente antippen zum Bearbeiten. „Ab“ zählt von links bzw. oben.</p>
+            <p className="text-stone-500">
+              Pflanzen und Möbel ziehen. Eine Pflanze antippen, um ihre Höhe einzustellen oder sie zu löschen; Fenster, Türen und Möbel
+              antippen zum Bearbeiten. „Ab“ zählt von links bzw. oben. Danach speichern.
+            </p>
             <AddElements
               onAdd={(el) => {
                 if (el === "plant") {
@@ -275,14 +300,13 @@ export function RoomMapEditor({
                   setPositions((cur) => ({ ...cur, [selectedPlant.id]: null }));
                   setSelected(null);
                 }}
-                onDelete={() => {
-                  if (!confirm(`„${selectedPlant.name}“ mit Gießdaten, Töpfen und Fotos endgültig löschen?`)) return;
+                onDelete={() =>
                   start(async () => {
                     const res = await deletePlant(selectedPlant.id);
                     setState(res);
                     if (res.ok) setSelected(null);
-                  });
-                }}
+                  })
+                }
               />
             )}
             {selected && selected.kind !== "plant" && (
@@ -295,13 +319,13 @@ export function RoomMapEditor({
             )}
             {unplaced.length > 0 && (
               <div>
-                <p className="mb-1.5 text-xs font-medium text-stone-500">Nicht platziert – antippen, um sie in die Mitte zu setzen:</p>
+                <p className="mb-1.5 text-xs font-medium text-stone-500">Nicht auf der Karte – antippen, dann an die richtige Stelle ziehen:</p>
                 <div className="flex flex-wrap gap-1.5">
                   {unplaced.map((p) => (
                     <button
                       key={p.id}
                       className="rounded-full bg-stone-100 px-2.5 py-1 text-xs hover:bg-emerald-100 dark:bg-stone-800"
-                      onClick={() => setPositions((cur) => ({ ...cur, [p.id]: { x: draft!.width_m / 2, y: draft!.depth_m / 2 } }))}
+                      onClick={() => place(p)}
                     >
                       + {p.name}
                     </button>
@@ -422,7 +446,11 @@ function PlantPanel({
       <HeightField value={height} onChange={onHeight} />
       <div className="flex flex-wrap gap-2">
         <button className="btn-ghost px-2.5 py-1 text-xs" onClick={onUnplace}>Von Karte nehmen</button>
-        <button className="btn-danger ml-auto px-2.5 py-1 text-xs" onClick={onDelete}>Pflanze löschen</button>
+        <span className="ml-auto">
+          <ConfirmButton className="btn-danger px-2.5 py-1 text-xs" question={`„${plant.name}“ endgültig löschen?`} onConfirm={onDelete}>
+            Pflanze löschen
+          </ConfirmButton>
+        </span>
       </div>
     </div>
   );

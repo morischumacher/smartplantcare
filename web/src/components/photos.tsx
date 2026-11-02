@@ -1,5 +1,6 @@
 "use client";
 
+import { ConfirmButton } from "@/components/confirm-button";
 import { useRef, useState, useTransition } from "react";
 import { deletePhoto, reanalyzePhoto, registerPhoto, type ActionResult } from "@/app/actions";
 import { FormStatus } from "@/components/form-status";
@@ -118,9 +119,9 @@ export function PhotoTimeline({ photos }: { photos: Photo[] }) {
           <button className="btn-ghost" disabled={pending} onClick={() => start(async () => void (await reanalyzePhoto(current.id)))}>
             {pending ? "…" : a ? "Neu auswerten" : "Auswerten"}
           </button>
-          <button className="btn-danger" disabled={pending} onClick={() => confirm("Foto löschen?") && start(async () => void (await deletePhoto(current.id)))}>
+          <ConfirmButton disabled={pending} question="Foto löschen?" onConfirm={() => start(async () => void (await deletePhoto(current.id)))}>
             Löschen
-          </button>
+          </ConfirmButton>
         </div>
       </div>
     </div>
