@@ -27,7 +27,9 @@ Govee H5075 ─────────────┼─ BLE ─▶ Atom Lite /
 
 - Supabase (Free Tier) ist die einzige Datenquelle, kein Homeserver.
 - Clients mit wenig Logik (Scriptable, Garmin) lesen nur `summary`.
-- Die gesamte Fachlogik (Gieß-Empfehlung, Hinweise, Winterruhe) lebt im Backend, nicht in den Clients.
+- Die gesamte Fachlogik (Gieß-Empfehlung, Hinweise, Winterruhe) lebt im Backend, nicht in den Clients. Reine Logik liegt in `backend/supabase/functions/_shared/` ohne Deno-/Supabase-Imports, damit sie mit `node --test` testbar ist.
+- Umtopfen = neue Zeile in `pots`; Lernen nutzt nur Daten der aktuellen Topf-Periode, die vorherige dient (skaliert) als Startwert.
+- KI-Funktionen nutzen Claude über `@anthropic-ai/sdk` (Modell `claude-opus-5-5`, `fallbacks: "default"`).
 
 ## Ordnerstruktur
 
@@ -58,7 +60,7 @@ cd backend
 npx supabase start                         # lokale Supabase (Docker)
 npx supabase db reset                      # Migrationen neu anwenden
 npx supabase functions serve --env-file supabase/functions/.env
-node --test supabase/functions/ingest/     # Unit-Tests für die Payload-Validierung
+node --test supabase/functions/           # Unit-Tests (ingest-Validierung, Gieß-Logik)
 ```
 
 ```bash
@@ -71,7 +73,7 @@ esphome run plant-gateway.yaml             # Firmware bauen + flashen (USB oder 
 
 - [x] Schritt 1: Schema + `ingest`
 - [ ] Schritt 2: ESPHome auf dem Atom Lite – Firmware fertig und kompiliert, Test mit echter Hardware steht aus
-- [ ] Schritt 3: `summary` + Gieß-Logik
+- [x] Schritt 3: `summary` + Gieß-Logik (Lernen, Umtopfen, Gießen erkennen), Foto-Tagebuch + KI-Check (`analyze-photo`)
 - [ ] Schritt 4: Web-App
 - [ ] Schritt 5: ntfy
 - [ ] Schritt 6: Scriptable

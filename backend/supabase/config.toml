@@ -419,3 +419,7 @@ enabled = true
 # not with a Supabase JWT.
 [functions.ingest]
 verify_jwt = false
+
+# Clients (Scriptable, Garmin) authenticate with their own read token (x-read-token header).
+[functions.summary]
+verify_jwt = false
