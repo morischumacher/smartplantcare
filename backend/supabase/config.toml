@@ -423,3 +423,7 @@ verify_jwt = false
 # Clients (Scriptable, Garmin) authenticate with their own read token (x-read-token header).
 [functions.summary]
 verify_jwt = false
+
+# Called by the signed-in web app user; the function additionally rejects the anon key.
+[functions.analyze-photo]
+verify_jwt = true
