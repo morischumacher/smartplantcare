@@ -6,9 +6,9 @@ Postgres-Schema und Edge Functions. Die Supabase-CLI läuft über `npx`, eine gl
 
 | Tabelle | Inhalt |
 | --- | --- |
-| `rooms` | Raum mit Zielbereich Luftfeuchte |
+| `rooms` | Raum mit Zielbereich Luftfeuchte, Raumfotos (`photo_paths`) und abstraktem Grundriss (`floor_plan`) |
 | `sensors` | BLE-Sensor (MAC, Typ `flower_care` / `hygrometer`, Raum, zuletzt gesehen, Batterie, RSSI) |
-| `plants` | Pflanze mit Art, Raum, Zielbereichen (Feuchte, Licht, Temperatur, Leitfähigkeit) und Foto-Intervall |
+| `plants` | Pflanze mit Art, Raum, Zielbereichen (Feuchte, Licht, Temperatur, Leitfähigkeit), Foto-Intervall und Position auf der Raumkarte (`map_x`, `map_y` in m) |
 | `pots` | Topf-Perioden: Volumen, Maße, Erdart, seit wann. Umtopfen = neue Zeile |
 | `plant_sensors` | Zuordnung Pflanze ↔ Sensor(en), mehrere Sensoren pro Topf möglich |
 | `readings` | Rohmesswerte pro Sensor |
@@ -40,10 +40,11 @@ Content-Type: application/json
 
 ```
 GET /functions/v1/summary
-x-read-token: <SUMMARY_TOKEN>
+x-read-token: <SUMMARY_TOKEN>          (Widget, Garmin)
+Authorization: Bearer <Access-Token>   (alternativ: angemeldete Web-App)
 ```
 
-Liefert alle Räume mit Raumklima und darin die Pflanzen, dringendste zuerst. Pro Pflanze:
+Liefert alle Räume mit Raumklima und Grundriss (`floor_plan`) und darin die Pflanzen, dringendste zuerst. Pro Pflanze:
 
 | Feld | Bedeutung |
 | --- | --- |
@@ -54,6 +55,8 @@ Liefert alle Räume mit Raumklima und darin die Pflanzen, dringendste zuerst. Pr
 | `pending_waterings` | erkannte, aber nicht eingetragene Gießvorgänge der letzten 7 Tage – Menge bestätigen |
 | `hints` | Hinweise, z. B. `stays_wet`, `dries_fast`, `no_recovery`, `relearning`, `photo_findings` |
 | `photo_request` | Bitte um ein Foto mit Anlass (`repot`, `anomaly`, `season`, `scheduled`) oder `null` |
+| `map` | Position auf der Raumkarte `{x, y}` in Metern oder `null` |
+| `light_peak_7d` | hellste Stunde der letzten 7 Tage in lux – zeigt, wie hell der Standort ist |
 
 Oben im JSON steht `attention`: Anzahl Pflanzen, die Wasser brauchen (für Widget und Garmin).
 
@@ -79,6 +82,18 @@ Die Web-App lädt das Foto in den Bucket `plant-photos` (Pfad z. B. `<plant_id>/
 
 Kosten: grob 1–2 Cent pro Foto (Anthropic-API-Guthaben nötig).
 
+## Raumkarte (`plan-room`)
+
+```
+POST /functions/v1/plan-room
+Authorization: Bearer <Access-Token des angemeldeten Nutzers>
+{ "room_id": "<rooms.id>" }
+```
+
+Aus 1–4 Raumfotos (`rooms.photo_paths`, im Bucket unter `rooms/<room_id>/`) und dem letzten Tagebuchfoto jeder Pflanze im Raum zeichnet Claude einen abstrakten Grundriss von oben: Umriss, Fenster, Türen, Heizkörper, große Möbel und die Standorte der Pflanzen, alles in Metern. Die Funktion speichert nichts – die Web-App zeigt den Vorschlag, man korrigiert ihn (Pflanzen und Möbel verschieben, Elemente entfernen) und speichert dann `rooms.floor_plan` und `plants.map_x/map_y`. Format von `floor_plan`: siehe Kommentar in der Migration `20261102150000_room_map.sql`.
+
+Kosten: grob 5–10 Cent pro Grundriss.
+
 ## Secrets
 
 Unter **Edge Functions → Secrets** setzen:
@@ -86,8 +101,8 @@ Unter **Edge Functions → Secrets** setzen:
 | Name | Wofür |
 | --- | --- |
 | `INGEST_SECRET` | Atom Lite → `ingest` |
-| `SUMMARY_TOKEN` | Widget, Garmin, Web-App → `summary` (`openssl rand -hex 32`) |
-| `ANTHROPIC_API_KEY` | KI-Foto-Check, von https://console.anthropic.com |
+| `SUMMARY_TOKEN` | Widget, Garmin → `summary` (`openssl rand -hex 32`); die Web-App nutzt stattdessen den Login |
+| `ANTHROPIC_API_KEY` | KI-Foto-Check und Raumkarte, von https://console.anthropic.com |
 
 ## Demo-Daten
 

@@ -427,3 +427,7 @@ verify_jwt = false
 # Called by the signed-in web app user; the function additionally rejects the anon key.
 [functions.analyze-photo]
 verify_jwt = true
+
+# Called by the signed-in web app user; the function additionally rejects the anon key.
+[functions.plan-room]
+verify_jwt = true

@@ -9,6 +9,7 @@
 
 import Anthropic from "npm:@anthropic-ai/sdk@1";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { HttpError, isSignedIn, json, loadImage } from "../_shared/images.ts";
 import { seasonOf } from "../_shared/watering.ts";
 
 const supabase = createClient(
@@ -19,11 +20,6 @@ const supabase = createClient(
 const anthropic = new Anthropic({ apiKey: Deno.env.get("ANTHROPIC_API_KEY") });
 
 const MODEL = "claude-opus-5-5";
-const BUCKET = "plant-photos";
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // API limit per image
-const MEDIA_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
-type MediaType = (typeof MEDIA_TYPES)[number];
-
 const SEASON_DE = { winter: "Winter", spring: "Frühling", summer: "Sommer", autumn: "Herbst" };
 
 const ANALYSIS_SCHEMA = {
@@ -62,29 +58,6 @@ Beurteile Gesundheit, sichtbare Probleme, ob die Pflanze eher zu trocken oder zu
 und – falls ein früheres Foto dabei ist – das Wachstum seitdem. Beziehe die Sensordaten ein, aber
 widersprich ihnen, wenn das Foto etwas anderes zeigt. Sei konkret und knapp; schreibe alle Texte auf Deutsch.
 Wenn etwas auf dem Foto nicht zu erkennen ist, nutze "unclear" statt zu raten.`;
-
-function json(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-}
-
-class HttpError extends Error {
-  constructor(readonly status: number, message: string) {
-    super(message);
-  }
-}
-
-async function loadImage(path: string): Promise<{ media_type: MediaType; data: string }> {
-  const { data: blob, error } = await supabase.storage.from(BUCKET).download(path);
-  if (error || !blob) throw new HttpError(404, `image not found: ${path}`);
-  if (!MEDIA_TYPES.includes(blob.type as MediaType)) {
-    throw new HttpError(415, `unsupported image type ${blob.type}; use JPEG, PNG or WebP`);
-  }
-  if (blob.size > MAX_IMAGE_BYTES) throw new HttpError(413, "image larger than 5 MB; resize before upload");
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return { media_type: blob.type as MediaType, data: btoa(binary) };
-}
 
 async function sensorContext(plantId: string): Promise<string> {
   const { data: plant } = await supabase
@@ -138,8 +111,8 @@ async function analyze(photoId: string) {
     .maybeSingle();
 
   const [current, before, context] = await Promise.all([
-    loadImage(photo.storage_path),
-    previous ? loadImage(previous.storage_path) : Promise.resolve(null),
+    loadImage(supabase, photo.storage_path),
+    previous ? loadImage(supabase, previous.storage_path) : Promise.resolve(null),
     sensorContext(photo.plant_id),
   ]);
 
@@ -181,10 +154,7 @@ async function analyze(photoId: string) {
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
 
-  // The platform's JWT check also lets the public anon key through, so require a real user.
-  const token = req.headers.get("authorization")?.replace(/^Bearer /i, "") ?? "";
-  const { data: user } = await supabase.auth.getUser(token);
-  if (!user?.user) return json(401, { error: "unauthorized" });
+  if (!(await isSignedIn(supabase, req))) return json(401, { error: "unauthorized" });
 
   let photoId: unknown;
   try {

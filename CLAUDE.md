@@ -37,7 +37,7 @@ Govee H5075 ─────────────┼─ BLE ─▶ Atom Lite /
 | --- | --- |
 | `firmware/` | ESPHome-YAML für den M5Stack Atom Lite |
 | `backend/supabase/` | Supabase-Projekt `zvymcgkkjrfxqoartwrp` (eu-west-1): `migrations/` (SQL), `functions/` (Deno Edge Functions); Deploy automatisch per GitHub-Integration bei Push auf `main` |
-| `web/` | Web-App (PWA, Vercel) – Framework noch offen |
+| `web/` | Web-App: Next.js 16 (App Router, Cache Components) als PWA auf Vercel, Supabase Auth; Doku zur Next-Version in `web/node_modules/next/dist/docs/` |
 | `scriptable/` | JavaScript für das iPhone-Widget |
 | `garmin/` | Connect-IQ-Projekt (Monkey C) für den Forerunner 165 |
 
@@ -69,12 +69,18 @@ test/run.sh                                # Unit-Tests für die BLE-Auswertung 
 esphome run plant-gateway.yaml             # Firmware bauen + flashen (USB oder OTA)
 ```
 
+```bash
+cd web
+npm run dev                                # http://localhost:3000, braucht web/.env.local
+npm run build && npm run lint
+```
+
 ## Stand
 
 - [x] Schritt 1: Schema + `ingest`
 - [ ] Schritt 2: ESPHome auf dem Atom Lite – Firmware fertig und kompiliert, Test mit echter Hardware steht aus
 - [x] Schritt 3: `summary` + Gieß-Logik (Lernen, Umtopfen, Gießen erkennen), Foto-Tagebuch + KI-Check (`analyze-photo`)
-- [ ] Schritt 4: Web-App
+- [ ] Schritt 4: Web-App – gebaut (Übersicht, Pflanze, Tagebuch, Raumkarte, Einstellungen), Deploy auf Vercel steht aus
 - [ ] Schritt 5: ntfy
 - [ ] Schritt 6: Scriptable
 - [ ] Schritt 7: Garmin

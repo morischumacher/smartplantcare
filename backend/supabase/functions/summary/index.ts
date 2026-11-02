@@ -1,7 +1,8 @@
 // Compact, read-only overview for all clients (web app, Scriptable widget, Garmin glance).
 //
 // GET /functions/v1/summary
-// Header: x-read-token: <SUMMARY_TOKEN>
+// Header: x-read-token: <SUMMARY_TOKEN>   (widget, Garmin)
+//    or: Authorization: Bearer <user access token>   (web app)
 //
 // Per room: current climate from its hygrometer. Per plant: current values, watering status,
 // recommended amount, forecast, what was learned, unconfirmed waterings, hints and photo requests.
@@ -41,6 +42,18 @@ async function query<T>(promise: PromiseLike<{ data: T | null; error: unknown }>
   return data as T;
 }
 
+/** Average of the daily maximum light over the last 7 full and partial days (lux). */
+function dailyPeakLight(hourly: { hour: string; light: number | null }[], now: number): number | null {
+  const peaks = new Map<string, number>();
+  for (const h of hourly) {
+    if (h.light === null || ms(h.hour) < now - 7 * DAY) continue;
+    const day = h.hour.slice(0, 10);
+    peaks.set(day, Math.max(peaks.get(day) ?? 0, Number(h.light)));
+  }
+  if (peaks.size === 0) return null;
+  return Math.round([...peaks.values()].reduce((s, v) => s + v, 0) / peaks.size);
+}
+
 function climateStatus(humidity: number | null, min: number, max: number) {
   if (humidity === null) return "no_data";
   if (humidity < min) return "too_dry";
@@ -50,8 +63,8 @@ function climateStatus(humidity: number | null, min: number, max: number) {
 
 async function buildSummary(now: number) {
   const [rooms, plants, pots, links, latest, photos] = await Promise.all([
-    query(supabase.from("rooms").select("id, name, humidity_min, humidity_max").order("name")),
-    query(supabase.from("plants").select("id, name, species, room_id, moisture_min, moisture_max, photo_interval_days, created_at").is("archived_at", null).order("name")),
+    query(supabase.from("rooms").select("id, name, humidity_min, humidity_max, floor_plan").order("name")),
+    query(supabase.from("plants").select("id, name, species, room_id, moisture_min, moisture_max, photo_interval_days, created_at, map_x, map_y").is("archived_at", null).order("name")),
     query(supabase.from("pots").select("plant_id, started_at, volume_l, soil_type").order("started_at", { ascending: false })),
     query(supabase.from("plant_sensors").select("plant_id, sensor_id")),
     query(supabase.from("sensor_latest").select("sensor_id, type, room_id, ts, moisture, temperature, light, conductivity, humidity")),
@@ -76,7 +89,7 @@ async function buildSummary(now: number) {
     const [hourly, waterings] = await Promise.all([
       query(supabase.rpc("plant_hourly", { p_plant_id: plant.id, p_since: new Date(from).toISOString() })),
       query(supabase.from("waterings").select("ts, amount_ml, during_vacation").eq("plant_id", plant.id).gte("ts", new Date(from).toISOString())),
-    ]) as [{ hour: string; moisture: number | null }[], { ts: string; amount_ml: number; during_vacation: boolean }[]];
+    ]) as [{ hour: string; moisture: number | null; light: number | null }[], { ts: string; amount_ml: number; during_vacation: boolean }[]];
 
     const series: HourPoint[] = hourly.map((h) => ({ hour: ms(h.hour), moisture: num(h.moisture) }));
     const ws = waterings.map((w) => ({ ts: ms(w.ts), amount_ml: w.amount_ml, during_vacation: w.during_vacation }));
@@ -124,10 +137,12 @@ async function buildSummary(now: number) {
       name: plant.name,
       species: plant.species,
       room_id: plant.room_id,
+      map: plant.map_x === null ? null : { x: Number(plant.map_x), y: Number(plant.map_y) },
       moisture: s.moisture,
       temperature: avg("temperature"),
       light: avg("light"),
       conductivity: avg("conductivity"),
+      light_peak_7d: dailyPeakLight(hourly, now),
       target: { min: input.moisture_min, max: input.moisture_max },
       status: s.status,
       recommended_ml: s.recommended_ml,
@@ -145,6 +160,7 @@ async function buildSummary(now: number) {
     id: string | null;
     name: string;
     climate: Record<string, unknown> | null;
+    floor_plan: unknown;
     plants: typeof plantSummaries;
   };
   const roomEntries: RoomEntry[] = rooms.map((room) => {
@@ -160,11 +176,12 @@ async function buildSummary(now: number) {
         status: climateStatus(humidity, Number(room.humidity_min), Number(room.humidity_max)),
         ts: hygro ? hygro.ts : null,
       },
+      floor_plan: room.floor_plan,
       plants: plantSummaries.filter((p) => p.room_id === room.id),
     };
   });
   const unassigned = plantSummaries.filter((p) => !p.room_id || !rooms.some((r) => r.id === p.room_id));
-  if (unassigned.length > 0) roomEntries.push({ id: null, name: "Ohne Raum", climate: null, plants: unassigned });
+  if (unassigned.length > 0) roomEntries.push({ id: null, name: "Ohne Raum", climate: null, floor_plan: null, plants: unassigned });
 
   return {
     generated_at: iso(now),
@@ -173,11 +190,18 @@ async function buildSummary(now: number) {
   };
 }
 
+// Widget and Garmin send the read token; the web app sends the signed-in user's access token.
+async function authorized(req: Request): Promise<boolean> {
+  if (secretsMatch(req.headers.get("x-read-token"), SUMMARY_TOKEN)) return true;
+  const token = req.headers.get("authorization")?.replace(/^Bearer /i, "");
+  if (!token) return false;
+  const { data } = await supabase.auth.getUser(token);
+  return Boolean(data?.user);
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "GET") return json(405, { error: "method not allowed" });
-  if (!secretsMatch(req.headers.get("x-read-token"), SUMMARY_TOKEN)) {
-    return json(401, { error: "unauthorized" });
-  }
+  if (!(await authorized(req))) return json(401, { error: "unauthorized" });
   try {
     return json(200, await buildSummary(Date.now()));
   } catch (e) {
