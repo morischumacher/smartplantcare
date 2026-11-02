@@ -321,7 +321,7 @@ export function FloorPlanMap({
         {candidates.map((c) => (
           <g key={c.id} transform={`translate(${c.x} ${c.y})`} className="pointer-events-none">
             <circle r={0.17} className="fill-white/80 stroke-violet-500 dark:fill-stone-900/80" strokeWidth="0.03" strokeDasharray="0.06 0.04" />
-            <text fontSize={0.2} textAnchor="middle" dominantBaseline="central" className="fill-violet-600 font-semibold dark:fill-violet-300">?</text>
+            <text fontSize={0.2} textAnchor="middle" dominantBaseline="central" className="fill-violet-600 font-medium dark:fill-violet-300">?</text>
             {!compact && (
               <text
                 y={0.17 + fontSize * 0.95}
@@ -446,7 +446,7 @@ function PlantTooltip({
       <div className="rounded-xl border border-stone-200 bg-white/95 p-3 text-sm shadow-xl backdrop-blur dark:border-stone-700 dark:bg-stone-900/95">
         <div className="mb-2 flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <a href={`/plants/${plant.id}`} className="block truncate font-semibold hover:text-emerald-700 dark:hover:text-emerald-400">
+            <a href={`/plants/${plant.id}`} className="block truncate font-medium hover:text-emerald-700 dark:hover:text-emerald-400">
               {plant.name}
             </a>
             {plant.species && <p className="truncate text-xs text-stone-500 italic">{plant.species}</p>}

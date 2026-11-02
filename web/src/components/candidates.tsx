@@ -50,7 +50,7 @@ export function CandidateList({ candidates, species }: { candidates: Candidate[]
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="text-lg font-semibold">Erkannte Pflanzen ({candidates.length})</h2>
+        <h2 className="h2">Erkannte Pflanzen ({candidates.length})</h2>
         <p className="text-sm text-stone-500">
           Auf den Raumfotos gefunden, aber noch nicht angelegt. Prüfe Name und Art und lege sie an – bei unsicheren hilft eine Nahaufnahme.
         </p>
@@ -167,7 +167,6 @@ function CandidateCard({ candidate: c, species }: { candidate: Candidate; specie
         ref={input}
         type="file"
         accept="image/*"
-        capture="environment"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];

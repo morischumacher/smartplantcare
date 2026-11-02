@@ -33,7 +33,7 @@ export function ConfirmButton({
       <span className="text-stone-600 dark:text-stone-300">{question}</span>
       <button
         type="button"
-        className="rounded-lg bg-rose-600 px-2.5 py-1 font-medium text-white hover:bg-rose-700"
+        className="min-h-9 rounded-full bg-rose-600 px-3.5 py-1.5 font-medium text-white hover:bg-rose-700"
         onClick={() => {
           setAsking(false);
           onConfirm();
@@ -41,7 +41,7 @@ export function ConfirmButton({
       >
         {confirmLabel}
       </button>
-      <button type="button" className="rounded-lg px-2 py-1 text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800" onClick={() => setAsking(false)}>
+      <button type="button" className="min-h-9 rounded-full px-3 py-1.5 text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800" onClick={() => setAsking(false)}>
         Abbrechen
       </button>
     </span>

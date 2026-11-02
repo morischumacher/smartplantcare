@@ -12,7 +12,7 @@ export function plantTodos(p: PlantSummary): Todo[] {
   } else if (p.status === "water_soon" && p.next_watering_at) {
     todos.push({ level: "todo", text: `Gießen ${relTime(p.next_watering_at)}` });
   } else if (p.status === "no_data") {
-    todos.push({ level: "todo", text: "Sensor meldet sich nicht" });
+    todos.push({ level: "todo", text: "Noch keine Messwerte – Sensor zuordnen oder prüfen" });
   }
   if (p.pending_waterings.length > 0) {
     todos.push({

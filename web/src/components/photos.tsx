@@ -41,7 +41,7 @@ export function PhotoUpload({ plantId, reason }: { plantId: string; reason: stri
 
   return (
     <div className="space-y-2">
-      <input ref={input} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+      <input ref={input} type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
       <button className="btn" onClick={() => input.current?.click()} disabled={step !== null}>
         <CameraIcon className="size-4" />
         {step ?? "Foto hinzufügen"}

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -8,7 +9,13 @@ import { MoistureBar, Skeleton, StatusPill } from "@/components/ui";
 import { PendingWaterings, WateringForm, WateringHistory } from "@/components/watering";
 import { getHourly, getPhotos, getPlant, getSpecies, getSummary, getWaterings } from "@/lib/data";
 import { ImageCredit, SpeciesImage } from "@/components/species-ui";
-import { SOIL_TYPES, date, lightCategory, num, relTime } from "@/lib/format";
+import { SOIL_TYPES, date, isUuid, lightCategory, num, relTime } from "@/lib/format";
+
+export async function generateMetadata({ params }: PageProps<"/plants/[id]">): Promise<Metadata> {
+  const { id } = await params;
+  const p = isUuid(id) ? await getPlant(id) : null;
+  return { title: p?.name ?? "Pflanze" };
+}
 
 export default function PlantPage({ params, searchParams }: PageProps<"/plants/[id]">) {
   return (
@@ -28,6 +35,7 @@ const SOURCE = {
 
 async function Plant({ params, searchParams }: Pick<PageProps<"/plants/[id]">, "params" | "searchParams">) {
   const { id } = await params;
+  if (!isUuid(id)) notFound();
   const days = (await searchParams).days === "30" ? 30 : 7;
   const [summary, plant, hourly, waterings, photos] = await Promise.all([
     getSummary(),
@@ -48,34 +56,41 @@ async function Plant({ params, searchParams }: Pick<PageProps<"/plants/[id]">, "
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start gap-3">
+        {species && <SpeciesImage species={species} className="size-16 shrink-0 rounded-2xl" />}
         <div className="min-w-0 flex-1">
           <p className="text-sm text-stone-500">
             <Link href="/" className="hover:underline">Übersicht</Link>
             {room?.id && <> · <Link href={`/rooms/${room.id}`} className="hover:underline">{room.name}</Link></>}
           </p>
-          <h1 className="text-2xl font-semibold">{plant.name}</h1>
+          <h1>{plant.name}</h1>
           {plant.species && <p className="text-sm text-stone-500 italic">{plant.species}</p>}
         </div>
-        <StatusPill status={s.status} />
-        <Link href={`/plants/${id}/settings`} className="btn-ghost">Bearbeiten</Link>
+        <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end">
+          <StatusPill status={s.status} />
+          <Link href={`/plants/${id}/settings`} className="btn-ghost">Bearbeiten</Link>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat icon={<DropIcon className="size-4" />} label="Bodenfeuchte" value={`${num(s.moisture)} %`}>
-          <MoistureBar value={s.moisture} min={s.target.min} max={s.target.max} status={s.status} />
-          <p className="mt-1 text-xs text-stone-500">Ziel {s.target.min}–{s.target.max} %</p>
-        </Stat>
-        <Stat icon={<ThermoIcon className="size-4" />} label="Temperatur" value={`${num(s.temperature, 1)} °C`} />
-        <Stat icon={<SunIcon className="size-4" />} label="Licht" value={`${num(s.light)} lx`}>
-          {light && <p className="text-xs text-stone-500">Standort: {light.label} (max. {num(s.light_peak_7d)} lx)</p>}
-        </Stat>
-        <Stat icon={<span className="text-xs">µS</span>} label="Dünger (Leitwert)" value={`${num(s.conductivity)} µS/cm`} />
-      </div>
+      {s.moisture == null && s.temperature == null ? (
+        <NoReadings plantId={id} hasSensor={plant.plant_sensors.length > 0} />
+      ) : (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Stat icon={<DropIcon className="size-4" />} label="Bodenfeuchte" value={`${num(s.moisture)} %`}>
+            <MoistureBar value={s.moisture} min={s.target.min} max={s.target.max} status={s.status} />
+            <p className="mt-1 text-xs text-stone-500">Ziel {s.target.min}–{s.target.max} %</p>
+          </Stat>
+          <Stat icon={<ThermoIcon className="size-4" />} label="Temperatur" value={`${num(s.temperature, 1)} °C`} />
+          <Stat icon={<SunIcon className="size-4" />} label="Licht" value={`${num(s.light)} lx`}>
+            {light && <p className="text-xs text-stone-500">Standort: {light.label} (max. {num(s.light_peak_7d)} lx)</p>}
+          </Stat>
+          <Stat icon={<span className="text-xs">µS</span>} label="Dünger (Leitwert)" value={`${num(s.conductivity)} µS/cm`} />
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <section className="card p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold">Verlauf</h2>
+            <h2 className="font-medium">Verlauf</h2>
             <div className="flex rounded-lg bg-stone-100 p-0.5 text-xs dark:bg-stone-800">
               {[7, 30].map((d) => (
                 <Link
@@ -98,9 +113,9 @@ async function Plant({ params, searchParams }: Pick<PageProps<"/plants/[id]">, "
           />
         </section>
 
-        <div className="space-y-6">
+        <div className="order-first space-y-6 lg:order-none">
           <section className="card p-4">
-            <h2 className="mb-1 font-semibold">Gießen</h2>
+            <h2 className="mb-1 font-medium">Gießen</h2>
             <p className="mb-3 text-sm text-stone-500">
               {s.status === "water_now"
                 ? `Jetzt gießen – empfohlen ${s.recommended_ml ? `${num(s.recommended_ml)} ml` : "bis die Erde gleichmäßig feucht ist"}.`
@@ -135,7 +150,7 @@ async function Plant({ params, searchParams }: Pick<PageProps<"/plants/[id]">, "
               <Link href={`/species/${species.id}`} className="flex gap-3 p-4 hover:bg-stone-50 dark:hover:bg-stone-800/40">
                 <SpeciesImage species={species} className="size-16 shrink-0 rounded-lg" />
                 <div className="min-w-0">
-                  <p className="font-semibold">{species.common_name_de}</p>
+                  <p className="font-medium">{species.common_name_de}</p>
                   <p className="text-xs text-stone-500 italic">{species.scientific_name}</p>
                   <p className="mt-1 text-xs text-stone-500">
                     {[
@@ -152,7 +167,7 @@ async function Plant({ params, searchParams }: Pick<PageProps<"/plants/[id]">, "
           )}
 
           <section className="card p-4 text-sm">
-            <h2 className="mb-2 font-semibold">Was die App gelernt hat</h2>
+            <h2 className="mb-2 font-medium">Was die App gelernt hat</h2>
             <dl className="space-y-1.5">
               <Row label="1 % Feuchte entspricht">{s.learning.ml_per_point ? `${num(s.learning.ml_per_point)} ml` : "–"}</Row>
               <Row label="Trocknet ab um">{s.learning.dry_rate_per_day ? `${num(s.learning.dry_rate_per_day, 1)} % pro Tag` : "–"}</Row>
@@ -173,7 +188,7 @@ async function Plant({ params, searchParams }: Pick<PageProps<"/plants/[id]">, "
 
       <section className="card p-4">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="flex items-center gap-2 font-semibold"><CameraIcon className="size-5" /> Tagebuch</h2>
+          <h2 className="flex items-center gap-2 font-medium"><CameraIcon className="size-5" /> Tagebuch</h2>
           <PhotoUpload plantId={id} reason={s.photo_request?.reason ?? null} />
         </div>
         {s.photo_request && (
@@ -183,9 +198,33 @@ async function Plant({ params, searchParams }: Pick<PageProps<"/plants/[id]">, "
       </section>
 
       <section className="card p-4">
-        <h2 className="mb-2 font-semibold">Gießprotokoll</h2>
+        <h2 className="mb-2 font-medium">Gießprotokoll</h2>
         <WateringHistory items={waterings} />
       </section>
+    </div>
+  );
+}
+
+// No sensor values yet: say why and what to do, instead of four cards full of dashes.
+function NoReadings({ plantId, hasSensor }: { plantId: string; hasSensor: boolean }) {
+  return (
+    <div className="card flex items-start gap-3 p-4 text-sm">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-500 dark:bg-stone-800">
+        <DropIcon className="size-4" />
+      </span>
+      <div className="flex-1">
+        <p className="font-medium">Noch keine Messwerte</p>
+        <p className="mt-0.5 text-stone-500">
+          {hasSensor
+            ? "Der Sensor ist zugeordnet, hat aber noch nichts gesendet. Steht er in Reichweite des Gateways? Neue Werte kommen alle paar Minuten."
+            : "Ordne der Pflanze einen Bodensensor zu, dann erscheinen hier Feuchte, Licht, Temperatur und Dünger. Gießen eintragen geht auch ohne Sensor."}
+        </p>
+        {!hasSensor && (
+          <Link href={`/plants/${plantId}/settings`} className="mt-2 inline-block font-medium text-emerald-700 hover:underline dark:text-emerald-400">
+            Sensor zuordnen →
+          </Link>
+        )}
+      </div>
     </div>
   );
 }
@@ -194,7 +233,7 @@ function Stat({ icon, label, value, children }: { icon: React.ReactNode; label: 
   return (
     <div className="card p-4">
       <p className="mb-1 flex items-center gap-1.5 text-xs text-stone-500">{icon} {label}</p>
-      <p className="mb-2 text-xl font-semibold tabular-nums">{value}</p>
+      <p className="mb-2 font-display text-2xl tabular-nums">{value}</p>
       {children}
     </div>
   );

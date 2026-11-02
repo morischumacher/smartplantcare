@@ -1,9 +1,9 @@
 "use client";
 
 import { ConfirmButton } from "@/components/confirm-button";
-import { useActionState, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { addVacation, deleteRoom, deleteSensor, deleteVacation, saveNotifySettings, saveRoom, saveSensor, sendTestPush, type ActionResult } from "@/app/actions";
-import { FormStatus } from "@/components/form-status";
+import { FormStatus, useFormAction } from "@/components/form-status";
 
 type Option = { id: string; name: string };
 
@@ -16,31 +16,31 @@ export function RoomForm({
   hygrometers: Option[];
   hygrometerId?: string | null;
 }) {
-  const [state, action, pending] = useActionState(saveRoom, null);
+  const [state, onSubmit, pending] = useFormAction(saveRoom);
   const [deleting, start] = useTransition();
   return (
-    <form action={action} className="grid items-end gap-3 sm:grid-cols-[2fr_1fr_1fr_2fr_auto]">
+    <form onSubmit={onSubmit} className="grid grid-cols-2 items-end gap-3 sm:grid-cols-[2fr_1fr_1fr_2fr_auto]">
       {room && <input type="hidden" name="id" value={room.id} />}
-      <label>
+      <label className="col-span-2 sm:col-span-1">
         <span className="label">Name</span>
         <input className="input" name="name" defaultValue={room?.name} required placeholder="z. B. Wohnzimmer" />
       </label>
       <label>
         <span className="label">Luftfeuchte min %</span>
-        <input className="input" name="humidity_min" type="number" defaultValue={room?.humidity_min ?? 40} />
+        <input className="input" name="humidity_min" type="number" inputMode="numeric" defaultValue={room?.humidity_min ?? 40} />
       </label>
       <label>
         <span className="label">max %</span>
-        <input className="input" name="humidity_max" type="number" defaultValue={room?.humidity_max ?? 60} />
+        <input className="input" name="humidity_max" type="number" inputMode="numeric" defaultValue={room?.humidity_max ?? 60} />
       </label>
-      <label>
+      <label className="col-span-2 sm:col-span-1">
         <span className="label">Hygrometer</span>
         <select className="input" name="hygrometer_id" defaultValue={hygrometerId ?? ""}>
           <option value="">– keins –</option>
           {hygrometers.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
         </select>
       </label>
-      <div className="flex gap-1">
+      <div className="col-span-2 flex gap-1 sm:col-span-1">
         <button className="btn" disabled={pending}>{room ? "Speichern" : "Anlegen"}</button>
         {room && (
           <ConfirmButton
@@ -52,16 +52,16 @@ export function RoomForm({
           </ConfirmButton>
         )}
       </div>
-      <div className="sm:col-span-5"><FormStatus state={state} /></div>
+      <div className="col-span-2 sm:col-span-5"><FormStatus state={state} /></div>
     </form>
   );
 }
 
 export function SensorForm({ sensor, rooms }: { sensor: { id: string; name: string | null; mac: string; type: string; room_id: string | null }; rooms: Option[] }) {
-  const [state, action, pending] = useActionState(saveSensor, null);
+  const [state, onSubmit, pending] = useFormAction(saveSensor);
   const [deleting, start] = useTransition();
   return (
-    <form action={action} className="flex flex-wrap items-end gap-2">
+    <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-2">
       <input type="hidden" name="id" value={sensor.id} />
       <label className="min-w-40 flex-1">
         <span className="label">Name</span>
@@ -91,9 +91,9 @@ export function SensorForm({ sensor, rooms }: { sensor: { id: string; name: stri
 }
 
 export function VacationForm() {
-  const [state, action, pending] = useActionState(addVacation, null);
+  const [state, onSubmit, pending] = useFormAction(addVacation);
   return (
-    <form action={action} className="flex flex-wrap items-end gap-2">
+    <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-2">
       <label><span className="label">Von</span><input className="input" type="date" name="starts_on" required /></label>
       <label><span className="label">Bis</span><input className="input" type="date" name="ends_on" required /></label>
       <label className="min-w-40 flex-1"><span className="label">Notiz</span><input className="input" name="notes" placeholder="z. B. Nachbarin gießt" /></label>
@@ -118,12 +118,12 @@ function newTopic() {
 }
 
 export function NotifyForm({ settings }: { settings: { ntfy_topic: string | null; quiet_from: number | null; quiet_to: number | null } }) {
-  const [state, action, pending] = useActionState(saveNotifySettings, null);
+  const [state, onSubmit, pending] = useFormAction(saveNotifySettings);
   const [topic, setTopic] = useState(settings.ntfy_topic ?? "");
   const [test, setTest] = useState<ActionResult | null>(null);
   const [testing, start] = useTransition();
   return (
-    <form action={action} className="space-y-3">
+    <form onSubmit={onSubmit} className="space-y-3">
       <div className="flex flex-wrap items-end gap-2">
         <label className="min-w-56 flex-1">
           <span className="label">ntfy-Topic</span>

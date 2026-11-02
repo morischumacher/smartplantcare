@@ -48,3 +48,30 @@ export const SparkIcon = ({ className }: P) => (
     <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" />
   </svg>
 );
+export const HomeIcon = ({ className }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base}>
+    <path d="M4 10.5 12 4l8 6.5V20h-5v-6H9v6H4Z" />
+  </svg>
+);
+export const BookIcon = ({ className }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base}>
+    <path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3Z" />
+    <path d="M5 17a3 3 0 0 1 3-3h10" />
+  </svg>
+);
+export const GearIcon = ({ className }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base}>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6" />
+  </svg>
+);
+export const PlusIcon = ({ className }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base}>
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+export const ChevronIcon = ({ className }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base}>
+    <path d="m9 6 6 6-6 6" />
+  </svg>
+);

@@ -3,9 +3,9 @@
 import { ConfirmButton } from "@/components/confirm-button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { deletePlant, identifyPhoto, repot, savePlant } from "@/app/actions";
-import { FormStatus } from "@/components/form-status";
+import { FormStatus, useFormAction } from "@/components/form-status";
 import { SpeciesImage, SpeciesSelect } from "@/components/species-ui";
 import { SOIL_TYPES } from "@/lib/format";
 import { uploadPhoto } from "@/lib/image";
@@ -68,7 +68,7 @@ export function PlantForm({
   sensors: (Option & { taken_by: string | null })[];
   species: Species[];
 }) {
-  const [state, action, pending] = useActionState(savePlant, null);
+  const [state, onSubmit, pending] = useFormAction(savePlant);
   const form = useRef<HTMLFormElement>(null);
   const [speciesId, setSpeciesId] = useState(plant?.species_id ?? null);
   // a species the AI just created is not in the list until the page refreshes
@@ -87,7 +87,7 @@ export function PlantForm({
   }
 
   return (
-    <form ref={form} action={action} className="space-y-5">
+    <form ref={form} onSubmit={onSubmit} className="space-y-5">
       {plant && <input type="hidden" name="id" value={plant.id} />}
       <div className="flex gap-3 rounded-xl bg-stone-50 p-3 dark:bg-stone-800/40">
         {picked && <SpeciesImage species={picked} className="size-16 shrink-0 rounded-lg" />}
@@ -135,14 +135,19 @@ export function PlantForm({
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Name"><input className="input" name="name" defaultValue={plant?.name} required placeholder="z. B. Monstera Wohnzimmer" /></Field>
-        <Field label="Bezeichnung (frei)"><input className="input" name="species" defaultValue={plant?.species ?? ""} placeholder="z. B. Monstera deliciosa" /></Field>
+        <Field label="Sorte oder botanischer Name (optional)"><input className="input" name="species" defaultValue={plant?.species ?? ""} placeholder="z. B. Monstera deliciosa" /></Field>
         <Field label="Raum">
           <select className="input" name="room_id" defaultValue={plant?.room_id ?? ""}>
             <option value="">– kein Raum –</option>
             {rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
+          {rooms.length === 0 && (
+            <span className="mt-1 block text-xs text-stone-500">
+              Noch kein Raum – unter <Link className="underline" href="/settings">Einstellungen</Link> anlegen, dann teilen sich die Pflanzen das Raumklima.
+            </span>
+          )}
         </Field>
-        <Field label="Foto-Erinnerung alle … Tage">
+        <Field label="Ans Foto erinnern alle … Tage">
           <input className="input" name="photo_interval_days" type="number" min="1" defaultValue={plant?.photo_interval_days ?? 14} />
         </Field>
       </div>
@@ -203,9 +208,9 @@ export function PlantForm({
 }
 
 export function RepotForm({ plantId }: { plantId: string }) {
-  const [state, action, pending] = useActionState(repot, null);
+  const [state, onSubmit, pending] = useFormAction(repot);
   return (
-    <form action={action} className="space-y-3">
+    <form onSubmit={onSubmit} className="space-y-3">
       <input type="hidden" name="plant_id" value={plantId} />
       <PotFields />
       <div className="grid gap-3 sm:grid-cols-2">

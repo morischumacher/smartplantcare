@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -5,8 +6,14 @@ import { archivePlant } from "@/app/actions";
 import { DeletePlantButton, PlantForm, RepotForm } from "@/components/plant-forms";
 import { Skeleton } from "@/components/ui";
 import { getPlant, getRooms, getSensors, getSpeciesList } from "@/lib/data";
-import { SOIL_TYPES, date, num } from "@/lib/format";
+import { SOIL_TYPES, date, isUuid, num } from "@/lib/format";
 import { sensorOptions } from "@/lib/sensors";
+
+export async function generateMetadata({ params }: PageProps<"/plants/[id]/settings">): Promise<Metadata> {
+  const { id } = await params;
+  const p = isUuid(id) ? await getPlant(id) : null;
+  return { title: p ? `${p.name} bearbeiten` : "Bearbeiten" };
+}
 
 export default function PlantSettingsPage({ params }: PageProps<"/plants/[id]/settings">) {
   return (
@@ -20,6 +27,7 @@ export default function PlantSettingsPage({ params }: PageProps<"/plants/[id]/se
 
 async function Settings({ params }: Pick<PageProps<"/plants/[id]/settings">, "params">) {
   const { id } = await params;
+  if (!isUuid(id)) notFound();
   const [plant, rooms, sensors, species] = await Promise.all([getPlant(id), getRooms(), getSensors(), getSpeciesList()]);
   if (!plant) notFound();
 
@@ -27,7 +35,7 @@ async function Settings({ params }: Pick<PageProps<"/plants/[id]/settings">, "pa
     <div className="space-y-6">
       <div>
         <p className="text-sm text-stone-500"><Link href={`/plants/${id}`} className="hover:underline">← {plant.name}</Link></p>
-        <h1 className="text-2xl font-semibold">Bearbeiten</h1>
+        <h1>Bearbeiten</h1>
       </div>
       <section className="card p-5">
         <PlantForm
@@ -39,7 +47,7 @@ async function Settings({ params }: Pick<PageProps<"/plants/[id]/settings">, "pa
       </section>
 
       <section className="card p-5">
-        <h2 className="mb-1 font-semibold">Umgetopft?</h2>
+        <h2 className="mb-1 font-medium">Umgetopft?</h2>
         <p className="mb-4 text-sm text-stone-500">
           Neuer Topf oder frische Erde verändern, wie schnell die Pflanze austrocknet. Die App übernimmt die bisherigen Werte
           angepasst an die neue Topfgröße und lernt dann neu.
@@ -60,7 +68,7 @@ async function Settings({ params }: Pick<PageProps<"/plants/[id]/settings">, "pa
       </section>
 
       <section className="card p-5">
-        <h2 className="mb-1 font-semibold">Archivieren</h2>
+        <h2 className="mb-1 font-medium">Archivieren</h2>
         <p className="mb-3 text-sm text-stone-500">Die Pflanze verschwindet aus der Übersicht, ihre Daten bleiben erhalten.</p>
         <form action={archivePlant.bind(null, id)}>
           <button className="btn-danger border border-rose-200 dark:border-rose-900">Pflanze archivieren</button>
@@ -68,7 +76,7 @@ async function Settings({ params }: Pick<PageProps<"/plants/[id]/settings">, "pa
       </section>
 
       <section className="card p-5">
-        <h2 className="mb-1 font-semibold">Löschen</h2>
+        <h2 className="mb-1 font-medium">Löschen</h2>
         <p className="mb-3 text-sm text-stone-500">Entfernt die Pflanze mit Gießdaten, Töpfen und Fotos. Die Messwerte bleiben beim Sensor, der Sensor wird frei. Lässt sich nicht rückgängig machen.</p>
         <DeletePlantButton plantId={id} name={plant.name} />
       </section>

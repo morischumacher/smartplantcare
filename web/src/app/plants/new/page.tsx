@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Neue Pflanze" };
 export default function NewPlantPage() {
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="mb-5 text-2xl font-semibold">Neue Pflanze</h1>
+      <h1 className="mb-5">Neue Pflanze</h1>
       <div className="card p-5">
         <Suspense fallback={<Skeleton className="h-96" />}>
           <Form />

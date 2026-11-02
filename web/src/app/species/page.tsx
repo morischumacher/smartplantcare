@@ -10,7 +10,7 @@ export default function SpeciesPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold">Pflanzenarten</h1>
+        <h1>Pflanzenarten</h1>
         <p className="text-sm text-stone-500">
           Pflegeprofile mit Zielwerten. Beim Anlegen einer Pflanze werden sie als Startwerte übernommen; fehlende Arten schreibt die KI.
         </p>

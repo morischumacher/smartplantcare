@@ -17,7 +17,9 @@ export function WateringForm({ plantId, recommended }: { plantId: string; recomm
       onSubmit={(e) => {
         e.preventDefault();
         start(async () => {
-          setState(await logWatering({ plantId, amountMl: Number(amount), ts: when ? new Date(when).toISOString() : undefined }));
+          const r = await logWatering({ plantId, amountMl: Number(amount), ts: when ? new Date(when).toISOString() : undefined });
+          setState(r);
+          if (r.ok) setWhen("");
         });
       }}
     >
@@ -30,13 +32,18 @@ export function WateringForm({ plantId, recommended }: { plantId: string; recomm
             onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))}
             aria-label="Menge in ml"
           />
-          <span className="absolute top-2 right-3 text-sm text-stone-400">ml</span>
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-stone-400">ml</span>
         </div>
         <button className="btn" disabled={pending || !amount}>{pending ? "…" : "Gegossen"}</button>
       </div>
       <div className="flex flex-wrap gap-1.5">
         {[100, 200, 300, 500].map((v) => (
-          <button key={v} type="button" onClick={() => setAmount(String(v))} className="rounded-full bg-stone-100 px-2.5 py-1 text-xs hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700">
+          <button
+            key={v}
+            type="button"
+            onClick={() => setAmount(String(v))}
+            className={`rounded-full px-3 py-1.5 text-sm transition sm:py-1 sm:text-xs ${amount === String(v) ? "bg-emerald-700 text-white dark:bg-emerald-500 dark:text-emerald-950" : "bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700"}`}
+          >
             {v} ml
           </button>
         ))}
@@ -119,5 +126,30 @@ export function WateringHistory({ items }: { items: { id: string; ts: string; am
         </li>
       ))}
     </ul>
+  );
+}
+
+/** One tap from the overview: log the recommended amount now. */
+export function QuickWater({ plantId, ml }: { plantId: string; ml: number }) {
+  const [pending, start] = useTransition();
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (done) return <span className="shrink-0 text-xs font-medium text-emerald-700 dark:text-emerald-400">✓ eingetragen</span>;
+  return (
+    <button
+      type="button"
+      className="btn shrink-0 px-3"
+      disabled={pending}
+      title={error ?? undefined}
+      onClick={() =>
+        start(async () => {
+          const r = await logWatering({ plantId, amountMl: ml });
+          if (r.ok) setDone(true);
+          else setError(r.error);
+        })
+      }
+    >
+      {pending ? "…" : error ? "Nochmal" : `${num(ml)} ml gegossen`}
+    </button>
   );
 }

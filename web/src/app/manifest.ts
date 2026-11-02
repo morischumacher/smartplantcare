@@ -2,13 +2,13 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Smart Plant Monitor",
-    short_name: "Pflanzen",
+    name: "Mo'sSmartPlantCare",
+    short_name: "Mo'sPlantCare",
     description: "Feuchte, Licht und Gießempfehlungen für deine Zimmerpflanzen",
     start_url: "/",
     display: "standalone",
-    background_color: "#fafaf9",
-    theme_color: "#059669",
+    background_color: "#f7f6f1",
+    theme_color: "#1f5835",
     lang: "de",
     icons: [
       { src: "/icon.svg", sizes: "any", type: "image/svg+xml" },

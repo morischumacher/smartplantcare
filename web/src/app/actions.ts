@@ -491,7 +491,7 @@ export async function sendTestPush(topic: string): Promise<ActionResult> {
   const res = await fetch(NTFY_SERVER, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic, title: "Pflanzen", message: "Test: Benachrichtigungen kommen an.", tags: ["seedling"] }),
+    body: JSON.stringify({ topic, title: "Mo'sSmartPlantCare", message: "Test: Benachrichtigungen kommen an.", tags: ["seedling"] }),
   });
   return res.ok ? { ok: true, message: "Gesendet – kommt sie in der ntfy-App an?" } : { ok: false, error: `ntfy: HTTP ${res.status}` };
 }

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { ensureSpecies, loadSpeciesImages, saveSpecies, type ActionResult } from "@/app/actions";
-import { FormStatus } from "@/components/form-status";
+import { FormStatus, useFormAction } from "@/components/form-status";
 import { LeafIcon, SparkIcon } from "@/components/icons";
 import { normalize } from "@/lib/search";
 import { num } from "@/lib/format";
@@ -45,13 +45,16 @@ export function SpeciesBrowser({ species }: { species: Species[] }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
-        <input className="input max-w-xs" placeholder="Suchen – deutsch, botanisch, Spitzname" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input className="input w-full sm:max-w-xs" type="search" placeholder="Suchen – deutsch oder botanisch" value={q} onChange={(e) => setQ(e.target.value)} />
         <AddSpecies initial={shown.length === 0 ? q : ""} />
         {missingImages > 0 && <LoadImages count={missingImages} />}
       </div>
+      {shown.length === 0 && (
+        <p className="text-sm text-stone-500">„{q}“ ist noch nicht in der Liste – oben hinzufügen, dann schreibt die KI ein Pflegeprofil.</p>
+      )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {shown.map((s) => (
-          <Link key={s.id} href={`/species/${s.id}`} className="card group overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md">
+          <Link key={s.id} href={`/species/${s.id}`} className="card group overflow-hidden transition hover:border-stone-300 active:scale-[0.99] dark:hover:border-stone-700">
             <SpeciesImage species={s} className="aspect-[4/3] w-full" />
             <div className="p-3">
               <p className="truncate font-medium group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{s.common_name_de}</p>
@@ -75,7 +78,7 @@ function AddSpecies({ initial }: { initial: string }) {
   const value = name || initial;
   return (
     <form
-      className="flex gap-2"
+      className="flex w-full flex-wrap gap-2 sm:w-auto"
       onSubmit={(e) => {
         e.preventDefault();
         start(async () => {
@@ -85,7 +88,7 @@ function AddSpecies({ initial }: { initial: string }) {
         });
       }}
     >
-      <input className="input w-52" placeholder="Neue Art, z. B. Alocasia zebrina" value={value} onChange={(e) => setName(e.target.value)} />
+      <input className="input min-w-0 flex-1 sm:w-52" placeholder="Neue Art, z. B. Alocasia" value={value} onChange={(e) => setName(e.target.value)} />
       <button className="btn" disabled={pending || value.trim().length < 2}>
         <SparkIcon className="size-4" /> {pending ? "KI schreibt Profil…" : "Hinzufügen"}
       </button>
@@ -100,7 +103,7 @@ function LoadImages({ count }: { count: number }) {
   return (
     <div className="flex items-center gap-2">
       <button className="btn-ghost" disabled={pending} onClick={() => start(async () => setState(await loadSpeciesImages()))}>
-        {pending ? "Lade Bilder…" : `Beispielbilder laden (${count})`}
+        {pending ? "Lade Bilder…" : `Fehlende Bilder laden (${count})`}
       </button>
       <FormStatus state={state} />
     </div>
@@ -108,7 +111,7 @@ function LoadImages({ count }: { count: number }) {
 }
 
 export function SpeciesForm({ species: s }: { species: Species }) {
-  const [state, action, pending] = useActionState(saveSpecies, null);
+  const [state, onSubmit, pending] = useFormAction(saveSpecies);
   const field = (name: keyof Species, label: string) => (
     <label>
       <span className="label">{label}</span>
@@ -116,7 +119,7 @@ export function SpeciesForm({ species: s }: { species: Species }) {
     </label>
   );
   return (
-    <form action={action} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-4">
       <input type="hidden" name="id" value={s.id} />
       <label className="block">
         <span className="label">Deutscher Name</span>

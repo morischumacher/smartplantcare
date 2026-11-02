@@ -1,10 +1,17 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ImageCredit, SpeciesForm, SpeciesImage } from "@/components/species-ui";
 import { Skeleton } from "@/components/ui";
 import { getSpecies } from "@/lib/data";
-import { SOIL_TYPES, num } from "@/lib/format";
+import { SOIL_TYPES, isUuid, num } from "@/lib/format";
+
+export async function generateMetadata({ params }: PageProps<"/species/[id]">): Promise<Metadata> {
+  const { id } = await params;
+  const p = isUuid(id) ? await getSpecies(id) : null;
+  return { title: p?.common_name_de ?? "Pflanzenart" };
+}
 
 export default function SpeciesDetailPage({ params }: PageProps<"/species/[id]">) {
   return (
@@ -15,7 +22,9 @@ export default function SpeciesDetailPage({ params }: PageProps<"/species/[id]">
 }
 
 async function Detail({ params }: Pick<PageProps<"/species/[id]">, "params">) {
-  const s = await getSpecies((await params).id);
+  const { id } = await params;
+  if (!isUuid(id)) notFound();
+  const s = await getSpecies(id);
   if (!s) notFound();
   const range = (a: number | null, b: number | null, unit: string) => (a === null && b === null ? "–" : `${num(a)}–${num(b)} ${unit}`);
 
@@ -24,12 +33,12 @@ async function Detail({ params }: Pick<PageProps<"/species/[id]">, "params">) {
       <p className="text-sm text-stone-500"><Link href="/species" className="hover:underline">← Pflanzenarten</Link></p>
       <div className="grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <div className="space-y-1">
-          <SpeciesImage species={s} className="aspect-square w-full rounded-2xl" />
+          <SpeciesImage species={s} className={`${s.image_url ? "aspect-[4/3]" : "aspect-[3/1]"} w-full rounded-2xl sm:aspect-square`} />
           <ImageCredit species={s} />
         </div>
         <div className="space-y-4">
           <div>
-            <h1 className="text-2xl font-semibold">{s.common_name_de}</h1>
+            <h1>{s.common_name_de}</h1>
             <p className="text-stone-500 italic">{s.scientific_name}</p>
             {s.aliases.length > 0 && <p className="text-xs text-stone-500">Auch: {s.aliases.join(", ")}</p>}
           </div>

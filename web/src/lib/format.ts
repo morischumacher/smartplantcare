@@ -43,25 +43,25 @@ export const STATUS: Record<Status, { label: string; dot: string; pill: string; 
     label: "Gießen",
     dot: "bg-rose-500",
     pill: "bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-200",
-    fill: "#f43f5e",
+    fill: "#c25637",
   },
   water_soon: {
     label: "Bald gießen",
     dot: "bg-amber-400",
     pill: "bg-amber-100 text-amber-800 dark:bg-amber-400/20 dark:text-amber-200",
-    fill: "#f59e0b",
+    fill: "#d5a434",
   },
   ok: {
     label: "Alles gut",
     dot: "bg-emerald-500",
     pill: "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200",
-    fill: "#10b981",
+    fill: "#348152",
   },
   no_data: {
     label: "Keine Daten",
     dot: "bg-stone-400",
     pill: "bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-200",
-    fill: "#a8a29e",
+    fill: "#a5a091",
   },
 };
 
@@ -90,3 +90,6 @@ export const PHOTO_REASONS: Record<string, string> = {
   repot: "Nach dem Umtopfen",
   manual: "Manuell",
 };
+
+/** Route ids are UUIDs; anything else would make the database query fail instead of showing "not found". */
+export const isUuid = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);

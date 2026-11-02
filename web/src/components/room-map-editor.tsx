@@ -358,7 +358,7 @@ export function RoomMapEditor({
         <RoomPhotos roomId={roomId} photos={photos} />
         <RoomScan roomId={roomId} scan={scan} scanPlan={scanPlan} />
         <div className="card space-y-3 p-4 text-sm">
-          <h2 className="font-semibold">Grundriss erstellen</h2>
+          <h2 className="font-medium">Grundriss erstellen</h2>
           <button className="btn w-full" onClick={generate} disabled={(photos.length === 0 && !scan && !scanPlan) || busy !== null}>
             <SparkIcon className="size-4" />
             {busy ? "Läuft…" : plan ? "Neu mit KI erstellen" : "Mit KI aus Fotos erstellen"}
@@ -673,7 +673,7 @@ function RoomPhotos({ roomId, photos }: { roomId: string; photos: { path: string
 
   return (
     <div className="card space-y-3 p-4 text-sm">
-      <h2 className="font-semibold">Raumfotos</h2>
+      <h2 className="font-medium">Raumfotos</h2>
       <p className="text-xs text-stone-500">
         Aus mehreren Ecken fotografieren, sodass Fenster, Heizung und die Pflanzen zu sehen sind. Die Fotos dienen nur zum Erkennen
         des Grundrisses.
@@ -760,7 +760,7 @@ function RoomScan({
 
   return (
     <div className="card space-y-3 p-4 text-sm">
-      <h2 className="font-semibold">iPhone-Scan <span className="font-normal text-stone-400">(optional)</span></h2>
+      <h2 className="font-medium">iPhone-Scan <span className="font-normal text-stone-400">(optional)</span></h2>
       <p className="text-xs text-stone-500">
         Aus einer LiDAR-App (z. B. ezSpace, Polycam, magicplan). <strong>IFC</strong> wird exakt übernommen; PDF, Bild oder Screenshot
         liest die KI. Heizungen und Pflanzen kommen in beiden Fällen aus den Fotos.
