@@ -18,6 +18,7 @@ import asyncio
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import urllib.error
@@ -112,19 +113,30 @@ async def run(interval: int, dry_run: bool):
         print(f"{time.strftime('%H:%M:%S')}  {mac}  {values}  ({adv.rssi} dBm)", flush=True)
 
     print("Starte Bluetooth … (beim ersten Mal fragt macOS nach der Bluetooth-Erlaubnis fürs Terminal)")
-    async with BleakScanner(on_advert):
-        print("Suche Flower Care … (Strg+C beendet). Werte kommen einzeln, etwa alle paar Sekunden je Sensor.", flush=True)
-        while True:
-            await asyncio.sleep(interval)
-            if not fresh:
-                print("– noch nichts empfangen; Sensor näher an den Mac?")
-                continue
-            readings = list(fresh.values())
-            fresh.clear()
-            if dry_run:
-                print("würde senden:", json.dumps(readings))
-            else:
-                print(f"sende {len(readings)} Sensor(en): {post(url, secret, readings)}", flush=True)
+    keep_awake()
+    while True:
+        # After the Mac slept, CoreBluetooth stops delivering adverts without an error, so the scanner
+        # is recreated whenever a whole interval passed without anything received.
+        async with BleakScanner(on_advert):
+            print("Suche Flower Care … (Strg+C beendet). Werte kommen einzeln, etwa alle paar Sekunden je Sensor.", flush=True)
+            while True:
+                await asyncio.sleep(interval)
+                if not fresh:
+                    print("– nichts empfangen (Ruhezustand? Sensor zu weit weg?); starte Bluetooth neu", flush=True)
+                    break
+                readings = list(fresh.values())
+                fresh.clear()
+                if dry_run:
+                    print("würde senden:", json.dumps(readings))
+                else:
+                    print(f"sende {len(readings)} Sensor(en): {post(url, secret, readings)}", flush=True)
+
+
+def keep_awake():
+    """Keeps the Mac from idle sleep while the bridge runs (closing the lid still sends it to sleep)."""
+    if sys.platform == "darwin":
+        subprocess.Popen(["caffeinate", "-i", "-w", str(os.getpid())])
+        print("Ruhezustand ist aus, solange das Skript läuft (Deckel zuklappen schläft trotzdem).")
 
 
 def selftest():

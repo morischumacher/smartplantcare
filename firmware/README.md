@@ -45,6 +45,8 @@ uv run firmware/mac-bridge.py             # alle 10 Minuten an Supabase senden
 
 Beim ersten Start fragt macOS nach der Bluetooth-Erlaubnis für das Terminal. Die Sensoren müssen in Bluetooth-Reichweite des Mac sein (wenige Meter).
 
+Solange das Skript läuft, verhindert es den Ruhezustand (`caffeinate`). Wird der Deckel zugeklappt, schläft der Mac trotzdem, und es kommen keine Werte an. Danach startet das Skript Bluetooth von selbst neu, sobald 10 Minuten lang nichts empfangen wurde.
+
 ## Erstes Flashen (per USB-C)
 
 1. Atom Lite per USB-C-**Datenkabel** an den Mac (reine Ladekabel funktionieren nicht).
