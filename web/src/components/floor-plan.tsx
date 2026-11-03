@@ -45,6 +45,8 @@ type Props = {
   editable?: boolean;
   compact?: boolean;
   selected?: Selection;
+  /** Plant to point out, e.g. while its card is hovered: enlarged, labelled, the others dimmed. */
+  highlight?: string | null;
   onMovePlant?: (id: string, pos: Pos) => void;
   onMoveFurniture?: (index: number, pos: Pos) => void;
   onSelect?: (s: Selection) => void;
@@ -96,6 +98,7 @@ export function FloorPlanMap({
   editable = false,
   compact = false,
   selected = null,
+  highlight = null,
   onMovePlant,
   onMoveFurniture,
   onSelect,
@@ -342,7 +345,8 @@ export function FloorPlanMap({
         {placed.map(({ plant, pos, shown: at }) => {
           const light = lightCategory(plant.light_peak_7d);
           const r = 0.17;
-          const isActive = shown === plant.id || (selected?.kind === "plant" && selected.id === plant.id);
+          const lit = highlight === plant.id;
+          const isActive = lit || shown === plant.id || (selected?.kind === "plant" && selected.id === plant.id);
           const stacked = at.y !== pos.y;
           const height = heightLabel(pos.h);
           const label = height ? `${plant.name} · ${height}` : plant.name;
@@ -352,7 +356,8 @@ export function FloorPlanMap({
             <g
               key={plant.id}
               transform={`translate(${at.x} ${at.y})`}
-              className={editable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}
+              opacity={highlight && !lit ? 0.35 : 1}
+              className={`transition-opacity ${editable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
               onPointerEnter={(e) => e.pointerType === "mouse" && setActive(plant.id)}
               onPointerDown={(e) => {
                 e.stopPropagation();
@@ -373,8 +378,9 @@ export function FloorPlanMap({
                   <animate attributeName="stroke-opacity" values="0.9;0" dur="1.8s" repeatCount="indefinite" />
                 </circle>
               )}
+              {lit && <circle r={r * 1.9} fill="none" className="pointer-events-none stroke-emerald-600 dark:stroke-emerald-400" strokeWidth="0.035" />}
               <circle
-                r={isActive ? r * 1.15 : r}
+                r={lit ? r * 1.35 : isActive ? r * 1.15 : r}
                 fill={STATUS[plant.status].fill}
                 stroke="white"
                 strokeWidth="0.045"
@@ -388,9 +394,9 @@ export function FloorPlanMap({
                 strokeLinecap="round"
                 className="pointer-events-none"
               />
-              {!compact && (
+              {(!compact || lit) && (
                 <text
-                  y={stacked ? fontSize * 0.35 : r + fontSize * 0.95}
+                  y={stacked ? fontSize * 0.35 : (lit ? r * 1.9 : r) + fontSize * 0.95}
                   fontSize={fontSize}
                   {...(stacked ? side : labelAt(at.x, label, fontSize))}
                   className="pointer-events-none fill-stone-700 font-medium dark:fill-stone-200"

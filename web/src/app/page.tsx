@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { FloorPlanMap } from "@/components/floor-plan";
 import { ChevronIcon, DropIcon, MapIcon, PlusIcon } from "@/components/icons";
 import { InstallHint } from "@/components/install-hint";
-import { PlantCard } from "@/components/plant-card";
+import { RoomPlants } from "@/components/room-plants";
 import { QuickWater } from "@/components/watering";
 import { Empty, Skeleton } from "@/components/ui";
 import { getSummary, getVacations } from "@/lib/data";
@@ -94,7 +93,6 @@ function RoomSection({ room }: { room: RoomSummary }) {
       : c?.status === "no_data" || !c
         ? "bg-stone-200 text-stone-600 dark:bg-stone-800 dark:text-stone-300"
         : "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200";
-  const placed = room.plants.some((p) => p.map);
 
   return (
     <section>
@@ -119,20 +117,7 @@ function RoomSection({ room }: { room: RoomSummary }) {
           </Link>
         )}
       </div>
-      <div className={room.floor_plan && placed ? "grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]" : ""}>
-        {room.floor_plan && placed && (
-          <div className="card hidden self-start p-3 lg:block">
-            <FloorPlanMap plan={room.floor_plan} plants={room.plants} compact />
-          </div>
-        )}
-        {room.plants.length > 0 ? (
-          <div className={`grid gap-3 sm:grid-cols-2 ${room.floor_plan && placed ? "" : "lg:grid-cols-3"}`}>
-            {room.plants.map((p) => <PlantCard key={p.id} plant={p} />)}
-          </div>
-        ) : (
-          <Empty>Noch keine Pflanzen in diesem Raum.</Empty>
-        )}
-      </div>
+      {room.plants.length > 0 ? <RoomPlants plan={room.floor_plan} plants={room.plants} /> : <Empty>Noch keine Pflanzen in diesem Raum.</Empty>}
     </section>
   );
 }

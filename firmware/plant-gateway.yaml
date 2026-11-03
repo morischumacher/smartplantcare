@@ -4,7 +4,7 @@
 
 substitutions:
   name: plant-gateway
-  send_interval: 5min
+  send_interval: 10min
 
 esphome:
   name: ${name}

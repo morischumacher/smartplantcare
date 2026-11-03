@@ -1,6 +1,6 @@
 # Firmware (ESPHome auf dem M5Stack Atom Lite)
 
-Der Atom Lite hört passiv auf Bluetooth-Advertisements aller **Flower Care (HHCCJCY01)** und **Govee H5075** in Reichweite, sammelt die Werte und schickt sie alle 5 Minuten per HTTPS an die Supabase-Funktion `ingest`.
+Der Atom Lite hört passiv auf Bluetooth-Advertisements aller **Flower Care (HHCCJCY01)** und **Govee H5075** in Reichweite, sammelt die Werte und schickt sie alle 10 Minuten per HTTPS an die Supabase-Funktion `ingest`.
 
 Sensoren werden **automatisch erkannt** – es stehen keine MAC-Adressen in der Konfiguration. Ein neuer Sensor erscheint nach spätestens ein paar Minuten in der Tabelle `sensors` in Supabase. Für weitere Pflanzen muss die Firmware nicht neu geflasht werden.
 
@@ -34,6 +34,17 @@ In `secrets.yaml` eintragen:
 
 `secrets.yaml` ist in `.gitignore` und landet nicht im Repo.
 
+## Ohne Atom Lite testen: der Mac als Gateway
+
+[`mac-bridge.py`](mac-bridge.py) hört am Mac auf die Flower Care und schickt die Werte im selben Format wie die Firmware an `ingest`. Gut, um Sensoren und Web-App zu testen, bevor der Atom Lite läuft. Braucht `ingest_secret` in `secrets.yaml` (siehe oben).
+
+```bash
+uv run firmware/mac-bridge.py --dry-run   # nur anzeigen, was ankommt
+uv run firmware/mac-bridge.py             # alle 10 Minuten an Supabase senden
+```
+
+Beim ersten Start fragt macOS nach der Bluetooth-Erlaubnis für das Terminal. Die Sensoren müssen in Bluetooth-Reichweite des Mac sein (wenige Meter).
+
 ## Erstes Flashen (per USB-C)
 
 1. Atom Lite per USB-C-**Datenkabel** an den Mac (reine Ladekabel funktionieren nicht).
@@ -55,7 +66,7 @@ esphome logs plant-gateway.yaml     # nur Logs ansehen
 
 ## Prüfen, ob alles läuft
 
-In den Logs erscheint alle 5 Minuten (sobald Sensoren in Reichweite sind):
+In den Logs erscheint alle 10 Minuten (sobald Sensoren in Reichweite sind):
 
 ```
 [I][main]: ingest: HTTP 200 {"inserted":3,"errors":[]}
@@ -67,7 +78,7 @@ In den Logs erscheint alle 5 Minuten (sobald Sensoren in Reichweite sind):
 | `HTTP 401` | `ingest_secret` stimmt nicht mit `INGEST_SECRET` in Supabase überein |
 | `HTTP 400` mit `errors` | Werte wurden abgelehnt – die Meldung sagt, welche |
 | `request failed` | keine Verbindung (WLAN, DNS, Zertifikat) |
-| keine Zeile | in den letzten 5 Minuten kein Sensor empfangen |
+| keine Zeile | in den letzten 10 Minuten kein Sensor empfangen |
 
 Danach in Supabase unter **Table Editor → `sensor_latest`** nachsehen.
 
