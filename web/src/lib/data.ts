@@ -112,7 +112,7 @@ export async function getSensors() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("sensors")
-    .select("id, mac, type, name, room_id, last_seen_at, last_battery, last_rssi, plant_sensors(plant_id)")
+    .select("id, mac, type, name, room_id, last_seen_at, last_battery, last_rssi, plant_sensors(plant_id, plants(name))")
     .order("type")
     .order("name", { nullsFirst: false });
   if (error) throw error;
@@ -120,6 +120,17 @@ export async function getSensors() {
 }
 
 /** null while the notifications migration is not deployed yet */
+export async function getArchivedPlants() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("plants")
+    .select("id, name, species, archived_at")
+    .not("archived_at", "is", null)
+    .order("archived_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
 export async function getNotifySettings() {
   const supabase = await createClient();
   const { data } = await supabase.from("notify_settings").select("ntfy_topic, quiet_from, quiet_to").maybeSingle();

@@ -15,7 +15,7 @@ import {
 } from "@/app/actions";
 import { FloorPlanMap, type Selection } from "@/components/floor-plan";
 import { FormStatus } from "@/components/form-status";
-import { CameraIcon, SparkIcon } from "@/components/icons";
+import { CameraIcon, ChevronIcon, SparkIcon } from "@/components/icons";
 import { SpeciesSelect } from "@/components/species-ui";
 import { uploadPhoto, uploadScan } from "@/lib/image";
 import type { Candidate, CandidateSuggestion, FloorPlan, PlantSummary, Species } from "@/lib/types";
@@ -193,6 +193,34 @@ export function RoomMapEditor({
   const unplaced = plants.filter((p) => !posOf(p));
   const selectedPlant = selected?.kind === "plant" ? plants.find((p) => p.id === selected.id) : undefined;
 
+  // photos, scan and AI generation: shown open while there is no map, folded away once there is one
+  const tools = (
+    <>
+      <RoomPhotos roomId={roomId} photos={photos} />
+      <RoomScan roomId={roomId} scan={scan} scanPlan={scanPlan} />
+      <div className="card space-y-3 p-4 text-sm">
+        <h2 className="font-medium">Grundriss erstellen</h2>
+        <button className="btn w-full" onClick={generate} disabled={(photos.length === 0 && !scan && !scanPlan) || busy !== null}>
+          <SparkIcon className="size-4" />
+          {busy ? "Läuft…" : plan ? "Neu mit KI erstellen" : "Mit KI aus Fotos erstellen"}
+        </button>
+        {plan && photos.length > 0 && (
+          <button className="btn-ghost w-full" onClick={rescan} disabled={busy !== null || editing}>
+            Pflanzen neu suchen
+          </button>
+        )}
+        {busy && <p className="animate-pulse text-xs text-stone-500">{busy}</p>}
+        {photos.length === 0 && <p className="text-xs text-stone-500">Dafür zuerst Raumfotos hochladen.</p>}
+        <p className="text-xs text-stone-500">
+          Erkennt dabei auch Pflanzen, die noch nicht angelegt sind
+          {scanPlan ? "; Wände, Fenster und Türen bleiben exakt wie im IFC-Scan" : scan ? ", und übernimmt die Maße aus dem Scan" : ""}.
+          {plan && photos.length > 0 && " „Pflanzen neu suchen“ lässt den Grundriss, wie er ist, und sucht nur nach Pflanzen."}
+        </p>
+        {!plan && !editing && <ManualStart onStart={(w, d) => edit(rectangle(w, d))} />}
+      </div>
+    </>
+  );
+
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       <div className="space-y-3">
@@ -243,7 +271,7 @@ export function RoomMapEditor({
           ) : (
             <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 text-center text-sm text-stone-500">
               <p className="font-medium text-stone-700 dark:text-stone-200">Noch keine Karte</p>
-              <p className="max-w-xs">Lade rechts 1–4 Fotos des Raums hoch, die KI zeichnet daraus einen Grundriss. Oder starte mit einem leeren Rechteck.</p>
+              <p className="max-w-xs">Lade unter „Raumfotos“ 1–4 Fotos des Raums hoch, die KI zeichnet daraus einen Grundriss. Oder starte mit einem leeren Rechteck.</p>
             </div>
           )}
         </div>
@@ -355,28 +383,17 @@ export function RoomMapEditor({
       </div>
 
       <aside className="space-y-4">
-        <RoomPhotos roomId={roomId} photos={photos} />
-        <RoomScan roomId={roomId} scan={scan} scanPlan={scanPlan} />
-        <div className="card space-y-3 p-4 text-sm">
-          <h2 className="font-medium">Grundriss erstellen</h2>
-          <button className="btn w-full" onClick={generate} disabled={(photos.length === 0 && !scan && !scanPlan) || busy !== null}>
-            <SparkIcon className="size-4" />
-            {busy ? "Läuft…" : plan ? "Neu mit KI erstellen" : "Mit KI aus Fotos erstellen"}
-          </button>
-          {plan && photos.length > 0 && (
-            <button className="btn-ghost w-full" onClick={rescan} disabled={busy !== null || editing}>
-              Pflanzen neu suchen
-            </button>
-          )}
-          {busy && <p className="animate-pulse text-xs text-stone-500">{busy}</p>}
-          {photos.length === 0 && <p className="text-xs text-stone-500">Dafür zuerst Raumfotos hochladen.</p>}
-          <p className="text-xs text-stone-500">
-            Erkennt dabei auch Pflanzen, die noch nicht angelegt sind
-            {scanPlan ? "; Wände, Fenster und Türen bleiben exakt wie im IFC-Scan" : scan ? ", und übernimmt die Maße aus dem Scan" : ""}.
-            {plan && photos.length > 0 && " „Pflanzen neu suchen“ lässt den Grundriss, wie er ist, und sucht nur nach Pflanzen."}
-          </p>
-          {!plan && !editing && <ManualStart onStart={(w, d) => edit(rectangle(w, d))} />}
-        </div>
+        {plan ? (
+          <details className="group">
+            <summary className="card flex cursor-pointer list-none items-center justify-between p-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
+              Fotos, Scan und KI-Grundriss
+              <ChevronIcon className="size-4 text-stone-400 transition group-open:rotate-90" />
+            </summary>
+            <div className="mt-4 space-y-4">{tools}</div>
+          </details>
+        ) : (
+          tools
+        )}
       </aside>
     </div>
   );

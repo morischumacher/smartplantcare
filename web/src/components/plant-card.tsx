@@ -38,7 +38,7 @@ export function PlantCard({ plant }: { plant: PlantSummary }) {
       {todos.length > 0 && (
         <ul className="mt-3 space-y-1 border-t border-stone-100 pt-3 text-xs dark:border-stone-800">
           {todos.map((t) => (
-            <li key={t.text} className={t.level === "urgent" ? "font-medium text-rose-600 dark:text-rose-400" : "text-stone-600 dark:text-stone-300"}>
+            <li key={t.text} className={t.level === "urgent" ? "font-medium text-rose-600 dark:text-rose-400" : t.level === "done" ? "font-medium text-emerald-700 dark:text-emerald-400" : "text-stone-600 dark:text-stone-300"}>
               {t.text}
             </li>
           ))}

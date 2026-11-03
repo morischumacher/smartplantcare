@@ -69,9 +69,12 @@ async function Settings({ params }: Pick<PageProps<"/plants/[id]/settings">, "pa
 
       <section className="card p-5">
         <h2 className="mb-1 font-medium">Archivieren</h2>
-        <p className="mb-3 text-sm text-stone-500">Die Pflanze verschwindet aus der Übersicht, ihre Daten bleiben erhalten.</p>
+        <p className="mb-3 text-sm text-stone-500">
+          Die Pflanze verschwindet aus der Übersicht, Verlauf und Fotos bleiben erhalten und ihr Sensor wird frei. Zurückholen kannst du sie unter
+          Einstellungen → Archiv.
+        </p>
         <form action={archivePlant.bind(null, id)}>
-          <button className="btn-danger border border-rose-200 dark:border-rose-900">Pflanze archivieren</button>
+          <button className="btn-ghost">Pflanze archivieren</button>
         </form>
       </section>
 

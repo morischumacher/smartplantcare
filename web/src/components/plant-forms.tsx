@@ -4,7 +4,7 @@ import { ConfirmButton } from "@/components/confirm-button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import { deletePlant, identifyPhoto, repot, savePlant } from "@/app/actions";
+import { deletePlant, ensureSpecies, identifyPhoto, repot, savePlant } from "@/app/actions";
 import { FormStatus, useFormAction } from "@/components/form-status";
 import { SpeciesImage, SpeciesSelect } from "@/components/species-ui";
 import { SOIL_TYPES } from "@/lib/format";
@@ -129,7 +129,7 @@ export function PlantForm({
             </button>
           )}
           <p className="text-xs text-stone-500">
-            Übernimmt Feuchte, Licht und Temperatur als Startwerte. Art fehlt? Unter <Link className="underline" href="/species">Arten</Link> von der KI anlegen lassen.
+            Übernimmt Feuchte, Licht und Temperatur als Startwerte. Art fehlt? Per Foto erkennen lassen oder unter <Link className="underline" href="/species">Arten</Link> anlegen.
           </p>
         </div>
       </div>
@@ -147,9 +147,6 @@ export function PlantForm({
             </span>
           )}
         </Field>
-        <Field label="Ans Foto erinnern alle … Tage">
-          <input className="input" name="photo_interval_days" type="number" min="1" defaultValue={plant?.photo_interval_days ?? 14} />
-        </Field>
       </div>
 
       <fieldset>
@@ -163,13 +160,19 @@ export function PlantForm({
       </fieldset>
 
       <details className="text-sm">
-        <summary className="cursor-pointer text-stone-500">Licht und Temperatur (optional)</summary>
+        <summary className="cursor-pointer py-1 text-stone-500">Weitere Einstellungen: Licht, Temperatur, Foto-Erinnerung</summary>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Field label="Licht min (lx)"><input className="input" name="light_min_lux" inputMode="numeric" defaultValue={plant?.light_min_lux ?? ""} /></Field>
           <Field label="Licht max (lx)"><input className="input" name="light_max_lux" inputMode="numeric" defaultValue={plant?.light_max_lux ?? ""} /></Field>
           <Field label="Temp. min (°C)"><input className="input" name="temp_min_c" inputMode="decimal" defaultValue={plant?.temp_min_c ?? ""} /></Field>
           <Field label="Temp. max (°C)"><input className="input" name="temp_max_c" inputMode="decimal" defaultValue={plant?.temp_max_c ?? ""} /></Field>
+          <div className="col-span-2">
+            <Field label="Ans Foto erinnern alle … Tage">
+              <input className="input" name="photo_interval_days" type="number" min="1" inputMode="numeric" defaultValue={plant?.photo_interval_days ?? 14} />
+            </Field>
+          </div>
         </div>
+        <p className="mt-2 text-xs text-stone-500">Wird beim Wählen der Pflanzenart vorausgefüllt. Aus der Temperatur entsteht die Warnung „zu kalt“ oder „zu warm“ für den Raum.</p>
       </details>
 
       {!plant && (
@@ -187,10 +190,12 @@ export function PlantForm({
         ) : (
           <div className="space-y-1.5">
             {sensors.map((s) => (
-              <label key={s.id} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="sensor_ids" value={s.id} defaultChecked={plant?.sensor_ids.includes(s.id)} className="accent-emerald-600" />
-                {s.name}
-                {s.taken_by && <span className="text-xs text-stone-400">(gehört zu {s.taken_by})</span>}
+              <label key={s.id} className="flex min-h-10 items-center gap-2.5 text-sm">
+                <input type="checkbox" name="sensor_ids" value={s.id} defaultChecked={plant?.sensor_ids.includes(s.id)} className="size-5 accent-emerald-600" />
+                <span>
+                  {s.name}
+                  {s.taken_by && <span className="block text-xs text-stone-400">steckt gerade in „{s.taken_by}“ – wird umgezogen</span>}
+                </span>
               </label>
             ))}
           </div>
@@ -255,11 +260,14 @@ function FromPhoto({ onFound }: { onFound: (sp: Species | null, name: string) =>
   const input = useRef<HTMLInputElement>(null);
   const [path, setPath] = useState<string | null>(null);
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  // recognised, but not in the species list yet: offer to create it right here
+  const [missing, setMissing] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   function pick(file: File | undefined) {
     if (!file) return;
     setNote(null);
+    setMissing(null);
     start(async () => {
       try {
         const p = await uploadPhoto(file, "identify");
@@ -269,7 +277,8 @@ function FromPhoto({ onFound }: { onFound: (sp: Species | null, name: string) =>
         if (!r.name) return setNote({ ok: false, text: `Keine Pflanze erkannt. ${r.reasoning}` });
         onFound(r.species, r.name);
         const sure = { high: "sicher", medium: "ziemlich sicher", low: "unsicher" }[r.confidence];
-        setNote({ ok: true, text: `${r.name} (${sure}): ${r.reasoning}${r.species ? "" : " – nicht in der Artenliste, bitte Art von Hand wählen."}` });
+        setNote({ ok: true, text: `${r.name} (${sure}): ${r.reasoning}` });
+        if (!r.species) setMissing(r.name);
       } catch (e) {
         setNote({ ok: false, text: e instanceof Error ? e.message : "Upload fehlgeschlagen" });
       } finally {
@@ -286,6 +295,24 @@ function FromPhoto({ onFound }: { onFound: (sp: Species | null, name: string) =>
         {pending ? "Erkenne Art…" : path ? "Anderes Bild" : "Von Bild erkennen"}
       </button>
       {note && <p className={`text-xs ${note.ok ? "text-emerald-700 dark:text-emerald-400" : "text-rose-600"}`}>{note.text}</p>}
+      {missing && (
+        <button
+          type="button"
+          className="btn w-full"
+          disabled={pending}
+          onClick={() =>
+            start(async () => {
+              const r = await ensureSpecies(missing);
+              if (!r.ok) return setNote({ ok: false, text: r.error });
+              setMissing(null);
+              onFound(r.species, missing);
+            })
+          }
+        >
+          {pending ? "Lege Art an…" : `„${missing}“ als neue Art anlegen`}
+        </button>
+      )}
+      {missing && !pending && <p className="text-xs text-stone-500">Noch nicht in der Artenliste. Die KI ergänzt Pflegewerte, das dauert ein paar Sekunden.</p>}
     </div>
   );
 }

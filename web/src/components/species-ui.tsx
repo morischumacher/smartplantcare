@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { ensureSpecies, loadSpeciesImages, saveSpecies, type ActionResult } from "@/app/actions";
 import { FormStatus, useFormAction } from "@/components/form-status";
@@ -72,6 +73,7 @@ export function SpeciesBrowser({ species }: { species: Species[] }) {
 }
 
 function AddSpecies({ initial }: { initial: string }) {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [state, setState] = useState<ActionResult | null>(null);
   const [pending, start] = useTransition();
@@ -83,8 +85,9 @@ function AddSpecies({ initial }: { initial: string }) {
         e.preventDefault();
         start(async () => {
           const r = await ensureSpecies(value);
-          setState(r.ok ? { ok: true, message: `${r.species.common_name_de} ist in der Liste` } : r);
-          if (r.ok) setName("");
+          if (!r.ok) return setState(r);
+          setName("");
+          router.push(`/species/${r.species.id}`);
         });
       }}
     >

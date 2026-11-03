@@ -154,6 +154,17 @@ test("summarize: status, amount and forecast", () => {
   assert.ok(soon.recommended_ml! >= 250 && soon.recommended_ml! <= 450, `got ${soon.recommended_ml}`);
 });
 
+test("summarize: a watering logged just now silences 'water now' until the sensor catches up", () => {
+  const dry = simulate({ hours: 8 * 24, start: 50, rate: 4, waterings: [{ hoursAgo: 7 * 24, to: 45 }] });
+  const s = summarize(plant(period(dry, [watering(168, 300), { ts: NOW - 10 * 60_000, amount_ml: 300, during_vacation: false }])));
+  assert.equal(s.status, "ok");
+  assert.equal(s.recommended_ml, null);
+  assert.ok(s.hints.some((h) => h.code === "just_watered"));
+  // three hours later the sensor counts again
+  const later = summarize(plant(period(dry, [watering(168, 300), watering(3, 300)])));
+  assert.equal(later.status, "water_now");
+});
+
 test("summarize: stale data gives no_data", () => {
   const s = summarize(plant(period(TWO_WATERINGS, []), { latest_moisture: { value: 30, ts: NOW - 5 * HOUR } }));
   assert.equal(s.status, "no_data");

@@ -52,7 +52,8 @@ export function PhotoUpload({ plantId, reason }: { plantId: string; reason: stri
 }
 
 export function PhotoTimeline({ photos }: { photos: Photo[] }) {
-  const [open, setOpen] = useState<string | null>(photos[0]?.id ?? null);
+  // null = the newest photo, so a fresh upload shows up right away
+  const [open, setOpen] = useState<string | null>(null);
   const [pending, start] = useTransition();
   if (photos.length === 0) return <p className="text-sm text-stone-500">Noch keine Fotos. Das erste Foto ist der Ausgangspunkt für spätere Vergleiche.</p>;
   const current = photos.find((p) => p.id === open) ?? photos[0];

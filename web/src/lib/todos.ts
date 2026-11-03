@@ -3,7 +3,7 @@ import type { PlantSummary } from "@/lib/types";
 
 // Turns a plant's summary into the short list of things to do, used on cards and map tooltips.
 
-export type Todo = { level: "urgent" | "todo" | "info"; text: string };
+export type Todo = { level: "urgent" | "todo" | "done" | "info"; text: string };
 
 export function plantTodos(p: PlantSummary): Todo[] {
   const todos: Todo[] = [];
@@ -23,6 +23,10 @@ export function plantTodos(p: PlantSummary): Todo[] {
   if (p.photo_request) todos.push({ level: "todo", text: "Foto machen" });
   for (const h of p.hints) {
     if (h.code === "confirm_watering") continue; // covered by pending_waterings
+    if (h.code === "just_watered") {
+      todos.unshift({ level: "done", text: "✓ Gerade gegossen" });
+      continue;
+    }
     todos.push({ level: h.severity === "warning" ? "urgent" : "info", text: h.message });
   }
   return todos;

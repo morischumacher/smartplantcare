@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { signOut } from "@/app/actions";
 import { Suspense } from "react";
-import { DeleteVacation, NotifyForm, RoomForm, SensorForm, VacationForm } from "@/components/settings-forms";
+import { DeleteVacation, NotifyForm, RestorePlant, RoomForm, SensorForm, SitterList, VacationForm } from "@/components/settings-forms";
 import { Skeleton } from "@/components/ui";
-import { getNotifySettings, getRooms, getSensors, getVacations } from "@/lib/data";
+import { getArchivedPlants, getNotifySettings, getRooms, getSensors, getSummary, getVacations } from "@/lib/data";
+import { sitterText } from "@/lib/sitter";
 import { date, relTime } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Einstellungen" };
@@ -20,7 +22,15 @@ export default function SettingsPage() {
 }
 
 async function Settings() {
-  const [rooms, sensors, vacations, notify] = await Promise.all([getRooms(), getSensors(), getVacations(), getNotifySettings()]);
+  const [rooms, sensors, vacations, notify, archived, summary] = await Promise.all([
+    getRooms(),
+    getSensors(),
+    getVacations(),
+    getNotifySettings(),
+    getArchivedPlants(),
+    getSummary(),
+  ]);
+  const next = vacations[0];
   const hygrometers = sensors.filter((s) => s.type === "hygrometer").map((s) => ({ id: s.id, name: s.name ?? s.mac }));
 
   return (
@@ -48,9 +58,15 @@ async function Settings() {
         <div>
           <h2 className="h2">Benachrichtigungen</h2>
           <p className="text-sm text-stone-500">
-            Push über die App ntfy: dort dasselbe Topic abonnieren. Gemeldet wird, was jetzt gegossen werden muss, Raumklima, Gieß-Auffälligkeiten
-            und stumme Sensoren – neu Aufgetretenes sofort, Andauerndes einmal am Tag. In der Ruhezeit und im Urlaub kommt nur Kritisches.
+            Push aufs Handy, wenn eine Pflanze Wasser braucht, das Raumklima nicht passt oder ein Sensor verstummt. In der Ruhezeit und im Urlaub kommt nur
+            Kritisches.
           </p>
+          <ol className="mt-2 list-decimal space-y-0.5 pl-5 text-sm text-stone-500">
+            <li>App „ntfy“ aus dem App Store installieren</li>
+            <li>Hier ein Topic erzeugen, kopieren und speichern</li>
+            <li>In ntfy auf „+“ tippen und das Topic abonnieren</li>
+            <li>„Test senden“ – die Nachricht sollte in ntfy ankommen</li>
+          </ol>
         </div>
         <div className="card p-4">
           {notify ? <NotifyForm settings={notify} /> : <p className="text-sm text-stone-500">Wird gerade eingerichtet – Datenbank noch nicht aktualisiert.</p>}
@@ -60,7 +76,7 @@ async function Settings() {
       <section className="space-y-3">
         <div>
           <h2 className="h2">Urlaub</h2>
-          <p className="text-sm text-stone-500">In dieser Zeit fließt Gießen nicht ins Lernen ein (z. B. wenn jemand anderes gießt) und es kommen nur kritische Benachrichtigungen.</p>
+          <p className="text-sm text-stone-500">In dieser Zeit fließt Gießen nicht ins Lernen ein und es kommen nur kritische Benachrichtigungen. Wer für dich gießt, bekommt die Gießliste unten – per WhatsApp, Mail oder ausgedruckt.</p>
         </div>
         <div className="card space-y-4 p-4">
           {vacations.length > 0 && (
@@ -75,13 +91,16 @@ async function Settings() {
             </ul>
           )}
           <VacationForm />
+          {summary.rooms.some((r) => r.plants.length > 0) && (
+            <SitterList text={sitterText(summary.rooms, next ? `${date(next.starts_on)} – ${date(next.ends_on)}` : undefined)} />
+          )}
         </div>
       </section>
 
       <section className="space-y-3">
         <div>
           <h2 className="h2">Sensoren</h2>
-          <p className="text-sm text-stone-500">Neue Sensoren tauchen automatisch auf, sobald das Gateway sie empfängt. Pflanzen-Sensoren ordnest du in der Pflanze zu.</p>
+          <p className="text-sm text-stone-500">Neue Sensoren tauchen automatisch auf, sobald das Gateway sie empfängt. Gib ihnen einen Namen, den du am Sensor wiedererkennst.</p>
         </div>
         {sensors.length === 0 ? (
           <p className="text-sm text-stone-500">Noch keine Sensoren.</p>
@@ -96,6 +115,15 @@ async function Settings() {
                   {s.last_battery !== null && <span>Akku {s.last_battery} %</span>}
                   {s.last_rssi !== null && <span>{s.last_rssi} dBm</span>}
                 </div>
+                {s.type !== "hygrometer" && (
+                  <p className="text-sm">
+                    {s.plant_sensors[0] ? (
+                      <>Steckt in <Link href={`/plants/${s.plant_sensors[0].plant_id}`} className="font-medium text-emerald-700 hover:underline dark:text-emerald-400">{plantName(s.plant_sensors[0].plants)}</Link></>
+                    ) : (
+                      <span className="text-stone-500">Noch keiner Pflanze zugeordnet – in der Pflanze unter „Bearbeiten“ auswählen.</span>
+                    )}
+                  </p>
+                )}
                 <SensorForm sensor={s} rooms={rooms} />
               </div>
             ))}
@@ -103,9 +131,34 @@ async function Settings() {
         )}
       </section>
 
+      {archived.length > 0 && (
+        <section className="space-y-3">
+          <div>
+            <h2 className="h2">Archiv</h2>
+            <p className="text-sm text-stone-500">Archivierte Pflanzen mit Verlauf und Fotos. Nach dem Zurückholen den Sensor neu zuordnen.</p>
+          </div>
+          <ul className="card divide-y divide-stone-100 text-sm dark:divide-stone-800">
+            {archived.map((p) => (
+              <li key={p.id} className="flex items-center gap-3 p-4">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{p.name}</span>
+                  <span className="block text-xs text-stone-500">archiviert {date(p.archived_at!)}</span>
+                </span>
+                <RestorePlant id={p.id} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <form action={signOut} className="sm:hidden">
         <button className="btn-ghost w-full">Abmelden</button>
       </form>
     </>
   );
+}
+
+// the embedded relation comes back as an object or a one-element array depending on the generated types
+function plantName(p: { name: string } | { name: string }[] | null): string {
+  return (Array.isArray(p) ? p[0]?.name : p?.name) ?? "Pflanze";
 }

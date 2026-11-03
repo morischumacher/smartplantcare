@@ -1,8 +1,8 @@
 "use client";
 
 import { ConfirmButton } from "@/components/confirm-button";
-import { useState, useTransition } from "react";
-import { addVacation, deleteRoom, deleteSensor, deleteVacation, saveNotifySettings, saveRoom, saveSensor, sendTestPush, type ActionResult } from "@/app/actions";
+import { useState, useSyncExternalStore, useTransition } from "react";
+import { addVacation, deleteRoom, deleteSensor, deleteVacation, restorePlant, saveNotifySettings, saveRoom, saveSensor, sendTestPush, type ActionResult } from "@/app/actions";
 import { FormStatus, useFormAction } from "@/components/form-status";
 
 type Option = { id: string; name: string };
@@ -130,6 +130,7 @@ export function NotifyForm({ settings }: { settings: { ntfy_topic: string | null
           <input className="input font-mono" name="ntfy_topic" value={topic} onChange={(e) => setTopic(e.target.value.trim())} placeholder="leer = aus" />
         </label>
         {!topic && <button type="button" className="btn-ghost" onClick={() => setTopic(newTopic())}>Topic erzeugen</button>}
+        {topic && <CopyButton text={topic} />}
         <button
           type="button"
           className="btn-ghost"
@@ -147,5 +148,60 @@ export function NotifyForm({ settings }: { settings: { ntfy_topic: string | null
       </div>
       {test && <FormStatus state={test} />}
     </form>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="btn-ghost"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        } catch {}
+      }}
+    >
+      {copied ? "✓ Kopiert" : "Kopieren"}
+    </button>
+  );
+}
+
+export function RestorePlant({ id }: { id: string }) {
+  const [pending, start] = useTransition();
+  return (
+    <button className="btn-ghost shrink-0" disabled={pending} onClick={() => start(async () => void (await restorePlant(id)))}>
+      {pending ? "…" : "Zurückholen"}
+    </button>
+  );
+}
+
+const noSubscribe = () => () => {};
+
+/** The watering list for a plant sitter: preview, then share (iOS share sheet) or copy. */
+export function SitterList({ text }: { text: string }) {
+  // server render: no share button; the client adds it where the browser has a share sheet
+  const canShare = useSyncExternalStore(noSubscribe, () => "share" in navigator, () => false);
+  return (
+    <details className="group rounded-2xl border border-stone-200 dark:border-stone-800">
+      <summary className="flex cursor-pointer list-none items-center justify-between p-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
+        Gießliste für die Vertretung
+        <span className="text-xs font-normal text-stone-500 group-open:hidden">anzeigen</span>
+      </summary>
+      <div className="space-y-3 border-t border-stone-200 p-3 dark:border-stone-800">
+        <pre className="font-sans text-sm whitespace-pre-wrap text-stone-700 dark:text-stone-300">{text}</pre>
+        <div className="flex gap-2">
+          {canShare && (
+            <button type="button" className="btn" onClick={() => navigator.share({ text }).catch(() => {})}>
+              Teilen
+            </button>
+          )}
+          <CopyButton text={text} />
+        </div>
+      </div>
+    </details>
   );
 }

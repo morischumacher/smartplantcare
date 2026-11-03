@@ -36,7 +36,7 @@ async function Room({ params }: Pick<PageProps<"/rooms/[id]">, "params">) {
   const urls = await signedUrls(room.scan_path ? [...paths, room.scan_path] : paths);
 
   return (
-    // On phones the plants come first; the floor plan and its setup tools follow.
+    // Found-but-not-added plants and the plant list come first on phones; the floor plan and its setup tools follow.
     <div className="flex flex-col gap-5">
       <div>
         <p className="text-sm text-stone-500"><Link href="/" className="hover:underline">Übersicht</Link></p>
@@ -49,6 +49,7 @@ async function Room({ params }: Pick<PageProps<"/rooms/[id]">, "params">) {
           </p>
         )}
       </div>
+      <CandidateList candidates={candidates} species={species} />
       {plants.length > 0 && (
         <section className="space-y-3 lg:order-last">
           <h2 className="h2">Pflanzen in diesem Raum</h2>
@@ -70,7 +71,6 @@ async function Room({ params }: Pick<PageProps<"/rooms/[id]">, "params">) {
           species={species}
         />
         <MapLegend />
-        <CandidateList candidates={candidates} species={species} />
       </section>
     </div>
   );

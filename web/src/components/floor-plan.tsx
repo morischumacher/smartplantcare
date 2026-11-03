@@ -475,7 +475,7 @@ function PlantTooltip({
             {todos.map((t) => (
               <li key={t.text} className="flex gap-1.5">
                 <span
-                  className={`mt-1 size-1.5 shrink-0 rounded-full ${t.level === "urgent" ? "bg-rose-500" : t.level === "todo" ? "bg-amber-400" : "bg-sky-400"}`}
+                  className={`mt-1 size-1.5 shrink-0 rounded-full ${t.level === "urgent" ? "bg-rose-500" : t.level === "todo" ? "bg-amber-400" : t.level === "done" ? "bg-emerald-500" : "bg-sky-400"}`}
                 />
                 <span className={t.level === "urgent" ? "font-medium" : undefined}>{t.text}</span>
               </li>

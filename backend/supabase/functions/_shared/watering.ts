@@ -86,6 +86,8 @@ const SETTLE_TIME = 12 * HOUR;
 const MIN_SEGMENT = 24 * HOUR;
 const MATCH_WINDOW = 3 * HOUR;
 const STALE_AFTER = 3 * HOUR;
+// After a logged watering the sensor needs a while to show the rise; until then the plant counts as watered.
+const JUST_WATERED = 2 * HOUR;
 const RECENCY_HALF_LIFE_DAYS = 60;
 const OTHER_SEASON_WEIGHT = 0.3;
 
@@ -312,6 +314,20 @@ export function summarize(input: PlantInput): PlantSummary {
     if (status !== "ok" && learning.ml_per_point !== null && moisture < max) {
       recommended = roundTo10((max - moisture) * learning.ml_per_point);
     }
+  }
+
+  const lastWatering = Math.max(-Infinity, ...current.waterings.map((w) => w.ts));
+  if (now - lastWatering <= JUST_WATERED && lastWatering <= now) {
+    if (status === "water_now" || status === "water_soon") {
+      status = "ok";
+      recommended = null;
+      nextAt = null;
+    }
+    hints.push({
+      code: "just_watered",
+      severity: "info",
+      message: "Gerade gegossen – der Sensor zeigt den Anstieg in den nächsten Minuten.",
+    });
   }
 
   // Waterings seen in the data but not logged (last 7 days): the user should confirm the amount.

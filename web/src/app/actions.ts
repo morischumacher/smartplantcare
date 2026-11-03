@@ -80,7 +80,7 @@ export async function logWatering(input: {
     return fail(e);
   }
   refresh();
-  return { ok: true, message: "Gespeichert" };
+  return { ok: true, message: `${Math.round(input.amountMl)} ml eingetragen` };
 }
 
 export async function deleteWatering(id: string): Promise<ActionResult> {
@@ -138,6 +138,9 @@ export async function savePlant(_prev: ActionResult | null, fd: FormData): Promi
     const { error: delError } = await supabase.from("plant_sensors").delete().eq("plant_id", plantId!);
     if (delError) throw delError;
     if (sensorIds.length > 0) {
+      // a sensor sits in one pot: assigning it here takes it away from any other plant
+      const { error: moveError } = await supabase.from("plant_sensors").delete().in("sensor_id", sensorIds);
+      if (moveError) throw moveError;
       const { error: linkError } = await supabase
         .from("plant_sensors")
         .insert(sensorIds.map((sensor_id) => ({ plant_id: plantId, sensor_id })));
@@ -151,10 +154,20 @@ export async function savePlant(_prev: ActionResult | null, fd: FormData): Promi
   return { ok: true, message: "Gespeichert" };
 }
 
+/** Hides a plant but keeps its history; its sensor becomes free for another plant. */
 export async function archivePlant(id: string) {
   const supabase = await createClient();
   await supabase.from("plants").update({ archived_at: new Date().toISOString() }).eq("id", id);
+  await supabase.from("plant_sensors").delete().eq("plant_id", id);
   redirect("/");
+}
+
+export async function restorePlant(id: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("plants").update({ archived_at: null }).eq("id", id);
+  if (error) return fail(error);
+  refresh();
+  return { ok: true };
 }
 
 /** Deletes a plant with all its data (waterings, pots, photos, sensor links). */

@@ -122,6 +122,9 @@ async function Plant({ params, searchParams }: Pick<PageProps<"/plants/[id]">, "
                 : s.next_watering_at
                   ? `Nächstes Gießen voraussichtlich ${relTime(s.next_watering_at)}.`
                   : "Noch keine Prognose."}
+              {waterings[0] && (
+                <span className="block text-xs">Zuletzt {relTime(waterings[0].ts)} · {num(waterings[0].amount_ml)} ml</span>
+              )}
             </p>
             <WateringForm plantId={id} recommended={s.recommended_ml} />
             {s.pending_waterings.length > 0 && (
@@ -169,8 +172,8 @@ async function Plant({ params, searchParams }: Pick<PageProps<"/plants/[id]">, "
           <section className="card p-4 text-sm">
             <h2 className="mb-2 font-medium">Was die App gelernt hat</h2>
             <dl className="space-y-1.5">
-              <Row label="1 % Feuchte entspricht">{s.learning.ml_per_point ? `${num(s.learning.ml_per_point)} ml` : "–"}</Row>
-              <Row label="Trocknet ab um">{s.learning.dry_rate_per_day ? `${num(s.learning.dry_rate_per_day, 1)} % pro Tag` : "–"}</Row>
+              <Row label="Wasser für +1 % Feuchte">{s.learning.ml_per_point ? `${num(s.learning.ml_per_point)} ml` : "–"}</Row>
+              <Row label="Trocknet aus um">{s.learning.dry_rate_per_day ? `${num(s.learning.dry_rate_per_day, 1)} % pro Tag` : "–"}</Row>
               <Row label="Grundlage">{SOURCE[s.learning.source]}</Row>
               <Row label="Sicherheit">{CONFIDENCE[s.learning.confidence]} ({s.learning.samples} Gießvorgänge)</Row>
               {pot && (
@@ -194,7 +197,7 @@ async function Plant({ params, searchParams }: Pick<PageProps<"/plants/[id]">, "
         {s.photo_request && (
           <p className="mb-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-100">{s.photo_request.message}</p>
         )}
-        <PhotoTimeline photos={photos} />
+        <PhotoTimeline key={photos[0]?.id ?? "none"} photos={photos} />
       </section>
 
       <section className="card p-4">
