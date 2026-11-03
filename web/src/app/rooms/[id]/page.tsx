@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { MapLegend } from "@/components/floor-plan";
 import { CandidateList } from "@/components/candidates";
-import { PlantCard } from "@/components/plant-card";
+import { PlantList } from "@/components/plant-card";
 import { RoomMapEditor } from "@/components/room-map-editor";
 import { Skeleton } from "@/components/ui";
 import { getCandidates, getRoom, getSpeciesList, getSummary, signedUrls } from "@/lib/data";
@@ -39,8 +39,11 @@ async function Room({ params }: Pick<PageProps<"/rooms/[id]">, "params">) {
     // Found-but-not-added plants and the plant list come first on phones; the floor plan and its setup tools follow.
     <div className="flex flex-col gap-5">
       <div>
-        <p className="text-sm text-stone-500"><Link href="/" className="hover:underline">Übersicht</Link></p>
-        <h1>{room.name}</h1>
+        <p className="hidden text-sm text-stone-500 sm:block"><Link href="/" className="hover:underline">Übersicht</Link></p>
+        <div className="flex items-start justify-between gap-3">
+          <h1>{room.name}</h1>
+          <Link href="/settings/rooms" className="btn-ghost shrink-0 px-3">Bearbeiten</Link>
+        </div>
         {climate && (
           <p className="text-sm text-stone-500">
             {climate.temperature == null && climate.humidity == null
@@ -53,9 +56,7 @@ async function Room({ params }: Pick<PageProps<"/rooms/[id]">, "params">) {
       {plants.length > 0 && (
         <section className="space-y-3 lg:order-last">
           <h2 className="h2">Pflanzen in diesem Raum</h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {plants.map((p) => <PlantCard key={p.id} plant={p} />)}
-          </div>
+          <PlantList plants={plants} />
         </section>
       )}
       <section className="space-y-5">

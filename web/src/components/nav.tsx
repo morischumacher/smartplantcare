@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "@/app/actions";
-import { BookIcon, GearIcon, HomeIcon, LeafIcon } from "@/components/icons";
+import { BookIcon, ChevronIcon, GearIcon, HomeIcon, LeafIcon } from "@/components/icons";
 
 // Top bar on every size; on phones the sections move into a tab bar at the bottom (thumb reach,
 // like a native app), on larger screens they sit in the top bar.
@@ -14,11 +14,29 @@ const LINKS = [
   { href: "/settings", label: "Einstellungen", Icon: GearIcon },
 ];
 
+// Where the back button of a sub-page leads (phones show it in place of the logo, like an iOS nav bar).
+function backLink(path: string): { href: string; label: string } | null {
+  const parts = path.split("/").filter(Boolean);
+  if (parts[0] === "plants" && parts.length === 3) return { href: `/plants/${parts[1]}`, label: "Pflanze" };
+  if (parts[0] === "plants" || parts[0] === "rooms") return { href: "/", label: "Pflanzen" };
+  if (parts[0] === "species" && parts.length === 2) return { href: "/species", label: "Arten" };
+  if (parts[0] === "settings" && parts.length === 2) return { href: "/settings", label: "Einstellungen" };
+  return null;
+}
+
+function BackLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link href={href} className="-ml-2 flex items-center gap-0.5 rounded-full py-1.5 pr-3 pl-1 text-base text-emerald-700 active:opacity-60 sm:hidden dark:text-emerald-400">
+      <ChevronIcon className="size-5 rotate-180" /> {label}
+    </Link>
+  );
+}
+
 const isActive = (path: string, href: string) => (href === "/" ? path === "/" || path.startsWith("/plants") || path.startsWith("/rooms") : path.startsWith(href));
 
-function Logo() {
+function Logo({ className = "" }: { className?: string }) {
   return (
-    <Link href="/" className="mr-4 flex items-center gap-2">
+    <Link href="/" className={`mr-4 flex items-center gap-2 ${className}`}>
       <span className="flex size-8 items-center justify-center rounded-full bg-emerald-700 text-white dark:bg-emerald-500 dark:text-emerald-950">
         <LeafIcon className="size-4.5" />
       </span>
@@ -31,17 +49,19 @@ function Logo() {
 export function NavFallback() {
   return (
     <nav className="mx-auto flex h-14 max-w-5xl items-center px-4">
-    <Logo />
-  </nav>
-);
+      <Logo />
+    </nav>
+  );
 }
 
 export function Nav() {
-const path = usePathname();
-const signedOut = path === "/login";
-return (
-  <nav className="mx-auto flex h-14 max-w-5xl items-center gap-1 px-4 text-sm">
-      <Logo />
+  const path = usePathname();
+  const signedOut = path === "/login";
+  const back = backLink(path);
+  return (
+    <nav className="mx-auto flex h-14 max-w-5xl items-center gap-1 px-4 text-sm">
+      {back && <BackLink {...back} />}
+      <Logo className={back ? "hidden sm:flex" : ""} />
       {!signedOut && (
         <>
           <div className="hidden items-center gap-1 sm:flex">

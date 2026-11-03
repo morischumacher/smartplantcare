@@ -18,7 +18,6 @@ import asyncio
 import json
 import os
 import re
-import subprocess
 import sys
 import time
 import urllib.error
@@ -113,7 +112,6 @@ async def run(interval: int, dry_run: bool):
         print(f"{time.strftime('%H:%M:%S')}  {mac}  {values}  ({adv.rssi} dBm)", flush=True)
 
     print("Starte Bluetooth … (beim ersten Mal fragt macOS nach der Bluetooth-Erlaubnis fürs Terminal)")
-    keep_awake()
     while True:
         # After the Mac slept, CoreBluetooth stops delivering adverts without an error, so the scanner
         # is recreated whenever a whole interval passed without anything received.
@@ -130,13 +128,6 @@ async def run(interval: int, dry_run: bool):
                     print("würde senden:", json.dumps(readings))
                 else:
                     print(f"sende {len(readings)} Sensor(en): {post(url, secret, readings)}", flush=True)
-
-
-def keep_awake():
-    """Keeps the Mac from idle sleep while the bridge runs (closing the lid still sends it to sleep)."""
-    if sys.platform == "darwin":
-        subprocess.Popen(["caffeinate", "-i", "-w", str(os.getpid())])
-        print("Ruhezustand ist aus, solange das Skript läuft (Deckel zuklappen schläft trotzdem).")
 
 
 def selftest():

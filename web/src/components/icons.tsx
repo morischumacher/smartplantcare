@@ -75,3 +75,33 @@ export const ChevronIcon = ({ className }: P) => (
     <path d="m9 6 6 6-6 6" />
   </svg>
 );
+export const BellIcon = ({ className }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base}>
+    <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15Z" />
+    <path d="M10 20.5a2 2 0 0 0 4 0" />
+  </svg>
+);
+export const SuitcaseIcon = ({ className }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base}>
+    <rect x="4" y="7" width="16" height="12" rx="2" />
+    <path d="M9 7V5h6v2M4 12h16" />
+  </svg>
+);
+export const SensorIcon = ({ className }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base}>
+    <path d="M10 3h4v11l-2 7-2-7Z" />
+    <path d="M6 7a8 8 0 0 0 0 6M18 7a8 8 0 0 1 0 6" />
+  </svg>
+);
+export const DoorIcon = ({ className }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base}>
+    <path d="M5 21V4h11v17M3 21h16" />
+    <path d="M13 12h.01" />
+  </svg>
+);
+export const ArchiveIcon = ({ className }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base}>
+    <rect x="3" y="4" width="18" height="4" rx="1" />
+    <path d="M5 8v11h14V8M10 12h4" />
+  </svg>
+);

@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { ChevronIcon, DropIcon, MapIcon, PlusIcon } from "@/components/icons";
+import { AlertIcon, ChevronIcon, DropIcon, MapIcon, PlusIcon } from "@/components/icons";
 import { InstallHint } from "@/components/install-hint";
 import { RoomPlants } from "@/components/room-plants";
 import { QuickWater } from "@/components/watering";
 import { Empty, Skeleton } from "@/components/ui";
-import { getSummary, getVacations } from "@/lib/data";
+import { getSensors, getSummary, getVacations } from "@/lib/data";
+import { silentSensors } from "@/lib/sensors";
 import { date, num, relTime } from "@/lib/format";
 import type { RoomSummary } from "@/lib/types";
 
@@ -18,10 +19,13 @@ export default function OverviewPage() {
 }
 
 async function Overview() {
-  const [summary, vacations] = await Promise.all([getSummary(), getVacations()]);
+  const [summary, vacations, sensors] = await Promise.all([getSummary(), getVacations(), getSensors()]);
   const plants = summary.rooms.flatMap((r) => r.plants);
   const today = new Date().toISOString().slice(0, 10);
   const vacation = vacations.find((v) => v.starts_on <= today);
+  // when the data is from, rather than when the page was built: the gateway may have stopped sending
+  const lastSeen = sensors.map((x) => x.last_seen_at).filter((t): t is string => !!t).sort().at(-1);
+  const silent = silentSensors(sensors);
   const thirsty = plants.filter((p) => p.status === "water_now" || p.status === "water_soon");
 
   return (
@@ -30,7 +34,8 @@ async function Overview() {
         <div>
           <h1>Deine Pflanzen</h1>
           <p className="text-sm text-stone-500">
-            {plants.length === 1 ? "1 Pflanze" : `${plants.length} Pflanzen`} · aktualisiert {relTime(summary.generated_at)}
+            {plants.length === 1 ? "1 Pflanze" : `${plants.length} Pflanzen`}
+            {lastSeen && ` · Messwerte ${relTime(lastSeen)}`}
           </p>
         </div>
         <Link href="/plants/new" className="btn shrink-0" aria-label="Pflanze hinzufügen">
@@ -39,6 +44,17 @@ async function Overview() {
       </div>
 
       <InstallHint />
+
+      {silent.length > 0 && (
+        <Link href="/settings/sensors" className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-400/10 dark:text-amber-100">
+          <AlertIcon className="size-5 shrink-0" />
+          <span className="flex-1">
+            {silent.length === 1 ? "Ein Sensor sendet" : `${silent.length} Sensoren senden`} seit {relTime(silent.map((x) => x.last_seen_at!).sort()[0]).replace(/^vor /, "")} nichts.
+            Läuft das Gateway und ist es in Reichweite?
+          </span>
+          <ChevronIcon className="size-4 shrink-0" />
+        </Link>
+      )}
 
       {vacation && (
         <div className="card border-sky-200 bg-sky-50 p-4 text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">
@@ -97,7 +113,14 @@ function RoomSection({ room }: { room: RoomSummary }) {
   return (
     <section>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h2 className="h2">{room.name}</h2>
+        {room.id ? (
+          <Link href={`/rooms/${room.id}`} className="group flex items-center gap-1">
+            <h2 className="h2 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{room.name}</h2>
+            <ChevronIcon className="size-4 text-stone-400" />
+          </Link>
+        ) : (
+          <h2 className="h2">{room.name}</h2>
+        )}
         {c && (
           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${climateClass}`}>
             {c.humidity === null && c.temperature === null ? (
@@ -111,9 +134,9 @@ function RoomSection({ room }: { room: RoomSummary }) {
             )}
           </span>
         )}
-        {room.id && (
+        {room.id && !room.floor_plan && (
           <Link href={`/rooms/${room.id}`} className="ml-auto flex items-center gap-1 rounded-full px-2 py-1 text-sm text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950">
-            <MapIcon className="size-4" /> {room.floor_plan ? "Karte" : "Karte anlegen"}
+            <MapIcon className="size-4" /> Karte anlegen
           </Link>
         )}
       </div>
@@ -125,9 +148,9 @@ function RoomSection({ room }: { room: RoomSummary }) {
 /** First start: what to do, in order. */
 function Welcome({ hasRooms }: { hasRooms: boolean }) {
   const steps = [
-    { done: hasRooms, title: "Raum anlegen", text: "z. B. Wohnzimmer – mit Zielwerten für die Luftfeuchte.", href: "/settings" },
+    { done: hasRooms, title: "Raum anlegen", text: "z. B. Wohnzimmer – mit Zielwerten für die Luftfeuchte.", href: "/settings/rooms" },
     { done: false, title: "Erste Pflanze hinzufügen", text: "Art per Foto erkennen lassen, Topfgröße eintragen, Sensor zuordnen.", href: "/plants/new" },
-    { done: false, title: "Benachrichtigungen einschalten", text: "Push aufs Handy, wenn eine Pflanze Wasser braucht.", href: "/settings#benachrichtigungen" },
+    { done: false, title: "Benachrichtigungen einschalten", text: "Push aufs Handy, wenn eine Pflanze Wasser braucht.", href: "/settings/notifications" },
   ];
   return (
     <section className="card p-5">

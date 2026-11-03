@@ -12,7 +12,7 @@ export async function getPlant(id: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("plants")
-    .select("*, pots(id, started_at, volume_l, diameter_cm, height_cm, soil_type, notes), plant_sensors(sensor_id)")
+    .select("*, pots(id, started_at, volume_l, diameter_cm, height_cm, soil_type, notes), plant_sensors(sensor_id, sensors(last_seen_at))")
     .eq("id", id)
     .order("started_at", { referencedTable: "pots", ascending: false })
     .maybeSingle();

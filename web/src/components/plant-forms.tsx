@@ -143,7 +143,7 @@ export function PlantForm({
           </select>
           {rooms.length === 0 && (
             <span className="mt-1 block text-xs text-stone-500">
-              Noch kein Raum – unter <Link className="underline" href="/settings">Einstellungen</Link> anlegen, dann teilen sich die Pflanzen das Raumklima.
+              Noch kein Raum – unter <Link className="underline" href="/settings/rooms">Einstellungen → Räume</Link> anlegen, dann teilen sich die Pflanzen das Raumklima.
             </span>
           )}
         </Field>
@@ -204,8 +204,9 @@ export function PlantForm({
 
       <Field label="Notizen"><textarea className="input" name="notes" rows={2} defaultValue={plant?.notes ?? ""} /></Field>
 
-      <div className="flex items-center gap-3">
-        <button className="btn" disabled={pending}>{pending ? "Speichern…" : plant ? "Speichern" : "Pflanze anlegen"}</button>
+      {/* stays in reach above the tab bar while scrolling through the long form */}
+      <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-10 -mx-5 -mb-5 flex items-center gap-3 rounded-b-3xl border-t border-stone-100 bg-white/95 px-5 py-3 backdrop-blur sm:bottom-0 dark:border-stone-800 dark:bg-stone-900/95">
+        <button className="btn flex-1 sm:flex-none" disabled={pending}>{pending ? "Speichern…" : plant ? "Speichern" : "Pflanze anlegen"}</button>
         <FormStatus state={state} />
       </div>
     </form>

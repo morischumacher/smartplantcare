@@ -16,3 +16,12 @@ export async function sensorOptions(sensors: Sensors, currentPlantId?: string) {
       return { id: s.id, name: s.name ?? s.mac, taken_by: other ? (names.get(other.plant_id) ?? null) : null };
     });
 }
+
+const SILENT_AFTER_MS = 60 * 60_000;
+
+/** Sensors in use (in a plant or a room) that were heard before but not within the last hour. */
+export function silentSensors(sensors: Sensors, now = Date.now()) {
+  return sensors.filter(
+    (s) => s.last_seen_at && (s.plant_sensors.length > 0 || s.room_id) && now - new Date(s.last_seen_at).getTime() > SILENT_AFTER_MS,
+  );
+}

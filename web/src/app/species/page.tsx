@@ -12,7 +12,7 @@ export default function SpeciesPage() {
       <div>
         <h1>Pflanzenarten</h1>
         <p className="text-sm text-stone-500">
-          Pflegeprofile mit Zielwerten. Beim Anlegen einer Pflanze werden sie als Startwerte übernommen; fehlende Arten schreibt die KI.
+          Pflegeprofile mit Zielwerten – sie sind die Startwerte für neue Pflanzen. Fehlt eine Art, such danach und lass sie von der KI anlegen.
         </p>
       </div>
       <Suspense fallback={<Skeleton className="h-96" />}>

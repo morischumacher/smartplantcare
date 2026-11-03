@@ -149,9 +149,8 @@ export async function savePlant(_prev: ActionResult | null, fd: FormData): Promi
   } catch (e) {
     return fail(e);
   }
-  if (!id) redirect(`/plants/${plantId}`);
-  refresh();
-  return { ok: true, message: "Gespeichert" };
+  // back to the plant either way: that is where the change shows
+  redirect(`/plants/${plantId}`);
 }
 
 /** Hides a plant but keeps its history; its sensor becomes free for another plant. */

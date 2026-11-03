@@ -1,164 +1,86 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { signOut } from "@/app/actions";
 import { Suspense } from "react";
-import { DeleteVacation, NotifyForm, RestorePlant, RoomForm, SensorForm, SitterList, VacationForm } from "@/components/settings-forms";
+import { signOut } from "@/app/actions";
+import { ArchiveIcon, BellIcon, DoorIcon, SensorIcon, SuitcaseIcon } from "@/components/icons";
+import { SettingsRow } from "@/components/settings-ui";
 import { Skeleton } from "@/components/ui";
-import { getArchivedPlants, getNotifySettings, getRooms, getSensors, getSummary, getVacations } from "@/lib/data";
-import { sitterText } from "@/lib/sitter";
-import { date, relTime } from "@/lib/format";
+import { getArchivedPlants, getNotifySettings, getRooms, getSensors, getVacations } from "@/lib/data";
+import { date } from "@/lib/format";
+import { silentSensors } from "@/lib/sensors";
 
 export const metadata: Metadata = { title: "Einstellungen" };
 
 export default function SettingsPage() {
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-2xl space-y-6">
       <h1>Einstellungen</h1>
-      <Suspense fallback={<Skeleton className="h-[36rem]" />}>
-        <Settings />
+      <Suspense fallback={<Skeleton className="h-80" />}>
+        <Menu />
       </Suspense>
+      <form action={signOut} className="sm:hidden">
+        <button className="btn-ghost w-full">Abmelden</button>
+      </form>
     </div>
   );
 }
 
-async function Settings() {
-  const [rooms, sensors, vacations, notify, archived, summary] = await Promise.all([
-    getRooms(),
-    getSensors(),
-    getVacations(),
-    getNotifySettings(),
-    getArchivedPlants(),
-    getSummary(),
-  ]);
-  const next = vacations[0];
-  const hygrometers = sensors.filter((s) => s.type === "hygrometer").map((s) => ({ id: s.id, name: s.name ?? s.mac }));
+// One row per area with its current state, so you see at a glance what is set up and what needs attention.
+async function Menu() {
+  const [rooms, sensors, vacations, notify, archived] = await Promise.all([getRooms(), getSensors(), getVacations(), getNotifySettings(), getArchivedPlants()]);
+  const soil = sensors.filter((s) => s.type !== "hygrometer");
+  const hygro = sensors.length - soil.length;
+  const unassigned = soil.filter((s) => s.plant_sensors.length === 0).length;
+  const silent = silentSensors(sensors).length;
+  const today = new Date().toISOString().slice(0, 10);
+  const v = vacations[0];
 
   return (
-    <>
-      <section className="space-y-3">
-        <div>
-          <h2 className="h2">Räume</h2>
-          <p className="text-sm text-stone-500">Pro Raum ein Hygrometer für Luftfeuchte und Temperatur.</p>
-        </div>
-        <div className="card divide-y divide-stone-100 dark:divide-stone-800">
-          {rooms.map((r) => (
-            <div key={r.id} className="p-4">
-              <RoomForm room={r} hygrometers={hygrometers} hygrometerId={sensors.find((s) => s.type === "hygrometer" && s.room_id === r.id)?.id} />
-            </div>
-          ))}
-          <div className="bg-stone-50/60 p-4 dark:bg-stone-900/40">
-            <p className="mb-2 text-sm font-medium">Neuer Raum</p>
-            <RoomForm hygrometers={hygrometers} />
-          </div>
-        </div>
-      </section>
-
-
-      <section id="benachrichtigungen" className="scroll-mt-20 space-y-3">
-        <div>
-          <h2 className="h2">Benachrichtigungen</h2>
-          <p className="text-sm text-stone-500">
-            Push aufs Handy, wenn eine Pflanze Wasser braucht, das Raumklima nicht passt oder ein Sensor verstummt. In der Ruhezeit und im Urlaub kommt nur
-            Kritisches.
-          </p>
-          <ol className="mt-2 list-decimal space-y-0.5 pl-5 text-sm text-stone-500">
-            <li>App „ntfy“ aus dem App Store installieren</li>
-            <li>Hier ein Topic erzeugen, kopieren und speichern</li>
-            <li>In ntfy auf „+“ tippen und das Topic abonnieren</li>
-            <li>„Test senden“ – die Nachricht sollte in ntfy ankommen</li>
-          </ol>
-        </div>
-        <div className="card p-4">
-          {notify ? <NotifyForm settings={notify} /> : <p className="text-sm text-stone-500">Wird gerade eingerichtet – Datenbank noch nicht aktualisiert.</p>}
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <div>
-          <h2 className="h2">Urlaub</h2>
-          <p className="text-sm text-stone-500">In dieser Zeit fließt Gießen nicht ins Lernen ein und es kommen nur kritische Benachrichtigungen. Wer für dich gießt, bekommt die Gießliste unten – per WhatsApp, Mail oder ausgedruckt.</p>
-        </div>
-        <div className="card space-y-4 p-4">
-          {vacations.length > 0 && (
-            <ul className="divide-y divide-stone-100 text-sm dark:divide-stone-800">
-              {vacations.map((v) => (
-                <li key={v.id} className="flex items-center gap-3 py-2">
-                  <span>{date(v.starts_on)} – {date(v.ends_on)}</span>
-                  {v.notes && <span className="text-stone-500">{v.notes}</span>}
-                  <span className="ml-auto"><DeleteVacation id={v.id} /></span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <VacationForm />
-          {summary.rooms.some((r) => r.plants.length > 0) && (
-            <SitterList text={sitterText(summary.rooms, next ? `${date(next.starts_on)} – ${date(next.ends_on)}` : undefined)} />
-          )}
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <div>
-          <h2 className="h2">Sensoren</h2>
-          <p className="text-sm text-stone-500">Neue Sensoren tauchen automatisch auf, sobald das Gateway sie empfängt. Gib ihnen einen Namen, den du am Sensor wiedererkennst.</p>
-        </div>
-        {sensors.length === 0 ? (
-          <p className="text-sm text-stone-500">Noch keine Sensoren.</p>
-        ) : (
-          <div className="card divide-y divide-stone-100 dark:divide-stone-800">
-            {sensors.map((s) => (
-              <div key={s.id} className="space-y-2 p-4">
-                <div className="flex flex-wrap gap-x-3 text-xs text-stone-500">
-                  <span className="font-medium text-stone-700 dark:text-stone-200">{s.type === "hygrometer" ? "Hygrometer" : "Flower Care"}</span>
-                  <span className="font-mono">{s.mac}</span>
-                  <span>zuletzt {relTime(s.last_seen_at)}</span>
-                  {s.last_battery !== null && <span>Akku {s.last_battery} %</span>}
-                  {s.last_rssi !== null && <span>{s.last_rssi} dBm</span>}
-                </div>
-                {s.type !== "hygrometer" && (
-                  <p className="text-sm">
-                    {s.plant_sensors[0] ? (
-                      <>Steckt in <Link href={`/plants/${s.plant_sensors[0].plant_id}`} className="font-medium text-emerald-700 hover:underline dark:text-emerald-400">{plantName(s.plant_sensors[0].plants)}</Link></>
-                    ) : (
-                      <span className="text-stone-500">Noch keiner Pflanze zugeordnet – in der Pflanze unter „Bearbeiten“ auswählen.</span>
-                    )}
-                  </p>
-                )}
-                <SensorForm sensor={s} rooms={rooms} />
-              </div>
-            ))}
-          </div>
+    <div className="space-y-6">
+      <div className="card divide-y divide-stone-100 overflow-hidden dark:divide-stone-800">
+        <SettingsRow
+          href="/settings/rooms"
+          icon={<DoorIcon className="size-5" />}
+          title="Räume"
+          detail={rooms.length ? rooms.map((r) => r.name).join(", ") : "Noch kein Raum – hier anlegen"}
+          warn={rooms.length === 0}
+        />
+        <SettingsRow
+          href="/settings/sensors"
+          icon={<SensorIcon className="size-5" />}
+          title="Sensoren"
+          detail={
+            sensors.length === 0
+              ? "Noch keine empfangen"
+              : silent
+                ? `${silent} ${silent === 1 ? "sendet" : "senden"} nichts mehr`
+                : unassigned
+                  ? `${unassigned} noch keiner Pflanze zugeordnet`
+                  : [`${soil.length} Bodensensor${soil.length === 1 ? "" : "en"}`, hygro && `${hygro} Hygrometer`].filter(Boolean).join(" · ")
+          }
+          warn={silent > 0 || unassigned > 0}
+        />
+        <SettingsRow
+          href="/settings/notifications"
+          icon={<BellIcon className="size-5" />}
+          title="Benachrichtigungen"
+          detail={notify?.ntfy_topic ? "An – Push über ntfy" : "Aus – einrichten in 2 Minuten"}
+          warn={!notify?.ntfy_topic}
+        />
+        <SettingsRow
+          href="/settings/vacation"
+          icon={<SuitcaseIcon className="size-5" />}
+          title="Urlaub"
+          detail={v ? `${v.starts_on <= today ? "Läuft gerade" : "Geplant"}: ${date(v.starts_on)} – ${date(v.ends_on)}` : "Nichts geplant"}
+        />
+        {archived.length > 0 && (
+          <SettingsRow
+            href="/settings/archive"
+            icon={<ArchiveIcon className="size-5" />}
+            title="Archiv"
+            detail={archived.length === 1 ? "1 archivierte Pflanze" : `${archived.length} archivierte Pflanzen`}
+          />
         )}
-      </section>
-
-      {archived.length > 0 && (
-        <section className="space-y-3">
-          <div>
-            <h2 className="h2">Archiv</h2>
-            <p className="text-sm text-stone-500">Archivierte Pflanzen mit Verlauf und Fotos. Nach dem Zurückholen den Sensor neu zuordnen.</p>
-          </div>
-          <ul className="card divide-y divide-stone-100 text-sm dark:divide-stone-800">
-            {archived.map((p) => (
-              <li key={p.id} className="flex items-center gap-3 p-4">
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{p.name}</span>
-                  <span className="block text-xs text-stone-500">archiviert {date(p.archived_at!)}</span>
-                </span>
-                <RestorePlant id={p.id} />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <form action={signOut} className="sm:hidden">
-        <button className="btn-ghost w-full">Abmelden</button>
-      </form>
-    </>
+      </div>
+    </div>
   );
-}
-
-// the embedded relation comes back as an object or a one-element array depending on the generated types
-function plantName(p: { name: string } | { name: string }[] | null): string {
-  return (Array.isArray(p) ? p[0]?.name : p?.name) ?? "Pflanze";
 }

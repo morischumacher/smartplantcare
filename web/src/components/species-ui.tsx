@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { ensureSpecies, loadSpeciesImages, saveSpecies, type ActionResult } from "@/app/actions";
 import { FormStatus, useFormAction } from "@/components/form-status";
-import { LeafIcon, SparkIcon } from "@/components/icons";
+import { ChevronIcon, LeafIcon, SparkIcon } from "@/components/icons";
 import { normalize } from "@/lib/search";
 import { num } from "@/lib/format";
 import type { Species } from "@/lib/types";
@@ -45,58 +45,57 @@ export function SpeciesBrowser({ species }: { species: Species[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <input className="input w-full sm:max-w-xs" type="search" placeholder="Suchen – deutsch oder botanisch" value={q} onChange={(e) => setQ(e.target.value)} />
-        <AddSpecies initial={shown.length === 0 ? q : ""} />
-        {missingImages > 0 && <LoadImages count={missingImages} />}
-      </div>
+      {/* one field: search, and when nothing matches, add what was typed as a new species */}
+      <input className="input" type="search" placeholder="Art suchen – deutsch oder botanisch" value={q} onChange={(e) => setQ(e.target.value)} />
       {shown.length === 0 && (
-        <p className="text-sm text-stone-500">„{q}“ ist noch nicht in der Liste – oben hinzufügen, dann schreibt die KI ein Pflegeprofil.</p>
+        <div className="card space-y-3 p-4">
+          <p className="text-sm text-stone-500">„{q}“ ist noch nicht dabei. Die KI schreibt ein Pflegeprofil mit Zielwerten, das du danach anpassen kannst.</p>
+          <AddSpecies name={q} />
+        </div>
       )}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      {shown.length > 0 && <ul className="card divide-y divide-stone-100 overflow-hidden dark:divide-stone-800">
         {shown.map((s) => (
-          <Link key={s.id} href={`/species/${s.id}`} className="card group overflow-hidden transition hover:border-stone-300 active:scale-[0.99] dark:hover:border-stone-700">
-            <SpeciesImage species={s} className="aspect-[4/3] w-full" />
-            <div className="p-3">
-              <p className="truncate font-medium group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{s.common_name_de}</p>
-              <p className="truncate text-xs text-stone-500 italic">{s.scientific_name}</p>
-              <p className="mt-1.5 text-xs text-stone-500">
-                Feuchte {num(s.moisture_min)}–{num(s.moisture_max)} %{s.winter_rest && " · Winterruhe"}
-                {s.source === "ai" && <span className="ml-1 rounded bg-violet-100 px-1 text-violet-700 dark:bg-violet-500/20 dark:text-violet-200">KI</span>}
-              </p>
-            </div>
-          </Link>
+          <li key={s.id}>
+            <Link href={`/species/${s.id}`} className="group flex items-center gap-3 px-4 py-2.5 transition hover:bg-stone-50 active:bg-stone-100 dark:hover:bg-stone-800/40 dark:active:bg-stone-800">
+              <SpeciesImage species={s} className="size-12 shrink-0 rounded-xl" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{s.common_name_de}</span>
+                <span className="block truncate text-xs text-stone-500">
+                  <span className="italic">{s.scientific_name}</span> · Feuchte {num(s.moisture_min)}–{num(s.moisture_max)} %{s.winter_rest && " · Winterruhe"}
+                </span>
+              </span>
+              {s.source === "ai" && <span className="shrink-0 rounded bg-violet-100 px-1 text-xs text-violet-700 dark:bg-violet-500/20 dark:text-violet-200">KI</span>}
+              <ChevronIcon className="size-4 shrink-0 text-stone-300 dark:text-stone-600" />
+            </Link>
+          </li>
         ))}
-      </div>
+      </ul>}
+      {missingImages > 0 && <LoadImages count={missingImages} />}
     </div>
   );
 }
 
-function AddSpecies({ initial }: { initial: string }) {
+function AddSpecies({ name }: { name: string }) {
   const router = useRouter();
-  const [name, setName] = useState("");
   const [state, setState] = useState<ActionResult | null>(null);
   const [pending, start] = useTransition();
-  const value = name || initial;
   return (
-    <form
-      className="flex w-full flex-wrap gap-2 sm:w-auto"
-      onSubmit={(e) => {
-        e.preventDefault();
-        start(async () => {
-          const r = await ensureSpecies(value);
-          if (!r.ok) return setState(r);
-          setName("");
-          router.push(`/species/${r.species.id}`);
-        });
-      }}
-    >
-      <input className="input min-w-0 flex-1 sm:w-52" placeholder="Neue Art, z. B. Alocasia" value={value} onChange={(e) => setName(e.target.value)} />
-      <button className="btn" disabled={pending || value.trim().length < 2}>
-        <SparkIcon className="size-4" /> {pending ? "KI schreibt Profil…" : "Hinzufügen"}
+    <div className="space-y-2">
+      <button
+        className="btn w-full sm:w-auto"
+        disabled={pending || name.trim().length < 2}
+        onClick={() =>
+          start(async () => {
+            const r = await ensureSpecies(name);
+            if (!r.ok) return setState(r);
+            router.push(`/species/${r.species.id}`);
+          })
+        }
+      >
+        <SparkIcon className="size-4" /> {pending ? "KI schreibt Profil…" : `„${name.trim()}“ als neue Art anlegen`}
       </button>
       <FormStatus state={state} />
-    </form>
+    </div>
   );
 }
 

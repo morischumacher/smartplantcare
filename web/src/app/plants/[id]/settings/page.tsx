@@ -34,7 +34,7 @@ async function Settings({ params }: Pick<PageProps<"/plants/[id]/settings">, "pa
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm text-stone-500"><Link href={`/plants/${id}`} className="hover:underline">← {plant.name}</Link></p>
+        <p className="hidden text-sm text-stone-500 sm:block"><Link href={`/plants/${id}`} className="hover:underline">← {plant.name}</Link></p>
         <h1>Bearbeiten</h1>
       </div>
       <section className="card p-5">

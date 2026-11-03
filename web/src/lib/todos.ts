@@ -12,7 +12,7 @@ export function plantTodos(p: PlantSummary): Todo[] {
   } else if (p.status === "water_soon" && p.next_watering_at) {
     todos.push({ level: "todo", text: `Gießen ${relTime(p.next_watering_at)}` });
   } else if (p.status === "no_data") {
-    todos.push({ level: "todo", text: "Noch keine Messwerte – Sensor zuordnen oder prüfen" });
+    todos.push({ level: "todo", text: "Noch keine Messwerte" });
   }
   if (p.pending_waterings.length > 0) {
     todos.push({
@@ -20,7 +20,7 @@ export function plantTodos(p: PlantSummary): Todo[] {
       text: p.pending_waterings.length === 1 ? "Erkanntes Gießen bestätigen" : `${p.pending_waterings.length}× erkanntes Gießen bestätigen`,
     });
   }
-  if (p.photo_request) todos.push({ level: "todo", text: "Foto machen" });
+  if (p.photo_request) todos.push({ level: "todo", text: "Tagebuch-Foto fällig" });
   for (const h of p.hints) {
     if (h.code === "confirm_watering") continue; // covered by pending_waterings
     if (h.code === "just_watered") {
