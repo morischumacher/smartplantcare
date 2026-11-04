@@ -117,8 +117,11 @@ async def run(interval: int, dry_run: bool):
         # is recreated whenever a whole interval passed without anything received.
         async with BleakScanner(on_advert):
             print("Suche Flower Care … (Strg+C beendet). Werte kommen einzeln, etwa alle paar Sekunden je Sensor.", flush=True)
+            # first send after a minute (enough for every value of each sensor), so a restart shows up in the app right away
+            wait = min(60, interval)
             while True:
-                await asyncio.sleep(interval)
+                await asyncio.sleep(wait)
+                wait = interval
                 if not fresh:
                     print("– nichts empfangen (Ruhezustand? Sensor zu weit weg?); starte Bluetooth neu", flush=True)
                     break
