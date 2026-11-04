@@ -454,6 +454,25 @@ export async function deleteSensor(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+/** Puts a sensor on the ignore list (e.g. a neighbour's): ingest drops its readings and it leaves plant and room. */
+export async function ignoreSensor(id: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error: linkError } = await supabase.from("plant_sensors").delete().eq("sensor_id", id);
+  if (linkError) return fail(linkError);
+  const { error } = await supabase.from("sensors").update({ ignored_at: new Date().toISOString(), room_id: null }).eq("id", id);
+  if (error) return fail(error);
+  refresh();
+  return { ok: true };
+}
+
+export async function unignoreSensor(id: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("sensors").update({ ignored_at: null }).eq("id", id);
+  if (error) return fail(error);
+  refresh();
+  return { ok: true };
+}
+
 export async function addVacation(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   const starts = str(fd, "starts_on");
   const ends = str(fd, "ends_on");

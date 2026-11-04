@@ -2,7 +2,7 @@
 
 import { ConfirmButton } from "@/components/confirm-button";
 import { useState, useSyncExternalStore, useTransition } from "react";
-import { addVacation, deleteRoom, deleteSensor, deleteVacation, restorePlant, saveNotifySettings, saveRoom, saveSensor, sendTestPush, type ActionResult } from "@/app/actions";
+import { addVacation, deleteRoom, deleteSensor, deleteVacation, ignoreSensor, restorePlant, unignoreSensor, saveNotifySettings, saveRoom, saveSensor, sendTestPush, type ActionResult } from "@/app/actions";
 import { FormStatus, useFormAction } from "@/components/form-status";
 
 type Option = { id: string; name: string };
@@ -80,7 +80,16 @@ export function SensorForm({ sensor, rooms }: { sensor: { id: string; name: stri
       <button className="btn-ghost" disabled={pending}>Speichern</button>
       <ConfirmButton
         disabled={deleting}
-        question="Sensor samt allen Messwerten löschen?"
+        question="Nicht dein Sensor? Er verschwindet aus der Liste, seine Werte werden nicht mehr gespeichert. Zurückholen geht unter „Ignoriert“."
+        confirmLabel="Ja, ignorieren"
+        className="btn-ghost"
+        onConfirm={() => start(async () => void (await ignoreSensor(sensor.id)))}
+      >
+        Ignorieren
+      </ConfirmButton>
+      <ConfirmButton
+        disabled={deleting}
+        question="Sensor samt allen Messwerten löschen? Empfängt das Gateway ihn wieder, taucht er neu auf."
         onConfirm={() => start(async () => void (await deleteSensor(sensor.id)))}
       >
         Löschen
@@ -166,6 +175,15 @@ function CopyButton({ text }: { text: string }) {
       }}
     >
       {copied ? "✓ Kopiert" : "Kopieren"}
+    </button>
+  );
+}
+
+export function UnignoreSensor({ id }: { id: string }) {
+  const [pending, start] = useTransition();
+  return (
+    <button className="btn-ghost shrink-0" disabled={pending} onClick={() => start(async () => void (await unignoreSensor(id)))}>
+      {pending ? "…" : "Zurückholen"}
     </button>
   );
 }

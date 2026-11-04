@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { SensorForm } from "@/components/settings-forms";
+import { SensorForm, UnignoreSensor } from "@/components/settings-forms";
 import { SettingsHeader } from "@/components/settings-ui";
 import { Empty, Skeleton } from "@/components/ui";
-import { getRooms, getSensors } from "@/lib/data";
+import { getIgnoredSensors, getRooms, getSensors } from "@/lib/data";
 import { relTime } from "@/lib/format";
 import { silentSensors } from "@/lib/sensors";
 
@@ -14,10 +14,13 @@ export default function SensorsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-5">
       <SettingsHeader title="Sensoren">
-        Neue Sensoren tauchen automatisch auf, sobald das Gateway sie empfängt. Gib ihnen einen Namen, den du am Sensor wiedererkennst. Welcher Sensor in welcher Pflanze steckt, legst du bei der Pflanze unter „Bearbeiten“ fest.
+        Neue Sensoren tauchen automatisch auf, sobald das Gateway sie empfängt. Gib ihnen einen Namen, den du am Sensor wiedererkennst. Welcher Sensor in welcher Pflanze steckt, legst du bei der Pflanze unter „Bearbeiten“ fest. Sensoren, die nicht dir gehören (z. B. beim Nachbarn), kannst du ignorieren.
       </SettingsHeader>
       <Suspense fallback={<Skeleton className="h-64" />}>
         <Sensors />
+      </Suspense>
+      <Suspense>
+        <Ignored />
       </Suspense>
     </div>
   );
@@ -59,6 +62,34 @@ async function Sensors() {
         );
       })}
     </div>
+  );
+}
+
+// Foreign sensors: their readings are dropped, but they stay listed so a mistake can be undone.
+async function Ignored() {
+  const ignored = await getIgnoredSensors();
+  if (ignored.length === 0) return null;
+  return (
+    <section className="space-y-3">
+      <div>
+        <h2 className="h2">Ignoriert</h2>
+        <p className="text-sm text-stone-500">Werte dieser Sensoren werden nicht gespeichert, und sie tauchen oben nicht mehr auf.</p>
+      </div>
+      <ul className="card divide-y divide-stone-100 text-sm dark:divide-stone-800">
+        {ignored.map((s) => (
+          <li key={s.id} className="flex items-center gap-3 p-4">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-medium">{s.name ?? (s.type === "hygrometer" ? "Hygrometer" : "Flower Care")}</span>
+              <span className="block truncate text-xs text-stone-500">
+                <span className="font-mono">{s.mac}</span> · zuletzt gesehen {relTime(s.last_seen_at)}
+                {s.last_rssi !== null && ` · ${s.last_rssi} dBm`}
+              </span>
+            </span>
+            <UnignoreSensor id={s.id} />
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

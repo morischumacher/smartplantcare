@@ -92,7 +92,7 @@ Neue Sensoren tauchen in `sensors` ohne Namen und Raum auf. Um herauszufinden, w
 
 Dann in `sensors` Name und Raum eintragen und den Sensor in `plant_sensors` einer Pflanze zuordnen. Später übernimmt das die Web-App.
 
-Hinweis: Auch Sensoren von Nachbarn in Funkreichweite werden angelegt. Sie stören nicht, solange sie keiner Pflanze zugeordnet sind – du kannst sie einfach löschen.
+Hinweis: Auch Sensoren von Nachbarn in Funkreichweite werden angelegt. Sie stören nicht, solange sie keiner Pflanze zugeordnet sind. In der Web-App unter Einstellungen → Sensoren kannst du sie ignorieren, dann werden ihre Werte nicht mehr gespeichert (und mit „Zurückholen“ wieder aufnehmen).
 
 ## Tests
 

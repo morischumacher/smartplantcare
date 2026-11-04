@@ -6,6 +6,7 @@
 //         or a single reading object.
 //
 // Unknown MACs are registered as new sensors so they show up in the database for assignment.
+// Sensors on the ignore list (ignored_at set) are not re-registered and their readings are dropped.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { type Reading, secretsMatch, validatePayload } from "./validate.ts";
@@ -24,20 +25,25 @@ function json(status: number, body: unknown): Response {
   });
 }
 
-async function resolveSensorIds(readings: Reading[]): Promise<{ ids: Map<string, string>; errors: string[] }> {
+async function resolveSensorIds(
+  readings: Reading[],
+): Promise<{ ids: Map<string, string>; ignored: Map<string, string>; errors: string[] }> {
   const typeByMac = new Map(readings.map((r) => [r.mac, r.type]));
   const macs = [...typeByMac.keys()];
 
   const { data: existing, error } = await supabase
     .from("sensors")
-    .select("id, mac, type")
+    .select("id, mac, type, ignored_at")
     .in("mac", macs);
   if (error) throw error;
 
   const ids = new Map<string, string>();
+  const ignored = new Map<string, string>();
   const errors: string[] = [];
   for (const s of existing) {
-    if (s.type !== typeByMac.get(s.mac)) {
+    if (s.ignored_at) {
+      ignored.set(s.mac, s.id);
+    } else if (s.type !== typeByMac.get(s.mac)) {
       errors.push(`${s.mac}: registered as ${s.type}, got ${typeByMac.get(s.mac)}`);
     } else {
       ids.set(s.mac, s.id);
@@ -60,7 +66,7 @@ async function resolveSensorIds(readings: Reading[]): Promise<{ ids: Map<string,
     for (const s of created) ids.set(s.mac, s.id);
   }
 
-  return { ids, errors };
+  return { ids, ignored, errors };
 }
 
 async function updateLastSeen(readings: Reading[], ids: Map<string, string>): Promise<void> {
@@ -94,7 +100,7 @@ Deno.serve(async (req) => {
   if (readings.length === 0) return json(400, { inserted: 0, errors });
 
   try {
-    const { ids, errors: sensorErrors } = await resolveSensorIds(readings);
+    const { ids, ignored, errors: sensorErrors } = await resolveSensorIds(readings);
     errors.push(...sensorErrors);
 
     // Always set ts explicitly: in a bulk insert, rows missing a column get null, not the default.
@@ -110,10 +116,13 @@ Deno.serve(async (req) => {
     if (rows.length > 0) {
       const { error } = await supabase.from("readings").insert(rows);
       if (error) throw error;
-      await updateLastSeen(readings, ids);
     }
+    // ignored sensors still get last_seen_at, so the ignore list shows whether they are still around
+    await updateLastSeen(readings, new Map([...ids, ...ignored]));
 
-    return json(rows.length > 0 ? 200 : 400, { inserted: rows.length, errors });
+    // readings from ignored sensors only are fine, not a bad request
+    const ok = rows.length > 0 || ignored.size > 0;
+    return json(ok ? 200 : 400, { inserted: rows.length, ignored: ignored.size, errors });
   } catch (e) {
     console.error("ingest failed", e);
     return json(500, { error: "database error" });

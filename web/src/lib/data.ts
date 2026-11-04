@@ -108,11 +108,13 @@ export async function getRoom(id: string) {
   return data;
 }
 
+/** Sensors in use; the ones on the ignore list come from getIgnoredSensors. */
 export async function getSensors() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("sensors")
     .select("id, mac, type, name, room_id, last_seen_at, last_battery, last_rssi, plant_sensors(plant_id, plants(name))")
+    .is("ignored_at", null)
     .order("type")
     .order("name", { nullsFirst: false });
   if (error) throw error;
@@ -120,6 +122,17 @@ export async function getSensors() {
 }
 
 /** null while the notifications migration is not deployed yet */
+export async function getIgnoredSensors() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("sensors")
+    .select("id, mac, type, name, last_seen_at, last_rssi, ignored_at")
+    .not("ignored_at", "is", null)
+    .order("ignored_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
 export async function getArchivedPlants() {
   const supabase = await createClient();
   const { data, error } = await supabase
