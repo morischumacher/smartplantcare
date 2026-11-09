@@ -10,7 +10,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { secretsMatch } from "../ingest/validate.ts";
-import { climateAlerts } from "../_shared/climate.ts";
+import { climateAlerts, plantTemperatureHint } from "../_shared/climate.ts";
 import { compactSummary } from "../_shared/compact.ts";
 import { type HourPoint, type PlantInput, type PlantSummary, type Pot, type PotPeriod, summarize } from "../_shared/watering.ts";
 
@@ -206,6 +206,18 @@ async function buildSummary(now: number) {
       plant_targets: r.plants.map((p) => ({ temp_min_c: p.temp_target.min, temp_max_c: p.temp_target.max })),
     };
   }));
+
+  // Temperature at each plant's own sensor, unless its room already reports the same problem.
+  for (const r of roomEntries) {
+    const roomAlert = alerts.find((a) => a.room === r.name && a.kind === "temperature")?.direction ?? null;
+    for (const p of r.plants) {
+      const hint = plantTemperatureHint(
+        { temperature: p.temperature, temp_min_c: p.temp_target.min, temp_max_c: p.temp_target.max },
+        r.climate ? roomAlert : null,
+      );
+      if (hint) p.hints.push(hint);
+    }
+  }
 
   return {
     generated_at: iso(now),

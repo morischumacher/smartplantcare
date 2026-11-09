@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { climateAlerts, type ClimateRoom } from "./climate.ts";
+import { climateAlerts, plantTemperatureHint, type ClimateRoom } from "./climate.ts";
 
 const room = (over: Partial<ClimateRoom> = {}): ClimateRoom => ({
   name: "Wohnzimmer",
@@ -46,4 +46,38 @@ test("critical alerts first, missing values ignored", () => {
     room({ name: "Flur", humidity: null, temperature: 8 }),
   ]);
   assert.deepEqual(out.map((a) => [a.room, a.severity]), [["Flur", "critical"], ["Bad", "warning"]]);
+});
+
+const plant = (temperature: number | null) => ({ temperature, temp_min_c: 16, temp_max_c: 28 });
+
+test("plant: nothing inside its range or within the margins", () => {
+  assert.equal(plantTemperatureHint(plant(15.2), null), null);
+  assert.equal(plantTemperatureHint(plant(30.5), null), null);
+  assert.equal(plantTemperatureHint(plant(null), null), null);
+});
+
+test("plant: cold spot even though the room is fine", () => {
+  const h = plantTemperatureHint(plant(13.4), null);
+  assert.equal(h?.code, "too_cold");
+  assert.equal(h?.severity, "warning");
+  assert.equal(h?.message, "Steht zu kalt (13,4 °C, mag ab 16 °C) – weg von Fenster oder Zugluft");
+});
+
+test("plant: too warm only well above its range (sensor in the sun)", () => {
+  assert.equal(plantTemperatureHint(plant(31.5), null)?.code, "too_hot");
+});
+
+test("plant: no duplicate of a room alert in the same direction", () => {
+  assert.equal(plantTemperatureHint(plant(12), "low"), null);
+  assert.equal(plantTemperatureHint(plant(12), "high")?.code, "too_cold");
+});
+
+test("plant: default range without species targets", () => {
+  assert.equal(plantTemperatureHint({ temperature: 10, temp_min_c: null, temp_max_c: null }, null)?.code, "too_cold");
+  assert.equal(plantTemperatureHint({ temperature: 14, temp_min_c: null, temp_max_c: null }, null), null);
+});
+
+test("room alerts carry their direction", () => {
+  assert.equal(climateAlerts([room({ temperature: 10 })])[0].direction, "low");
+  assert.equal(climateAlerts([room({ humidity: 70 })])[0].direction, "high");
 });

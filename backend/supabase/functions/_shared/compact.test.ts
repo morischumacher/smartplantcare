@@ -16,7 +16,7 @@ test("plants of all rooms, most urgent first, with room name and rounded moistur
   const out = compactSummary({
     generated_at: "2026-11-02T12:00:00Z",
     attention: 1,
-    alerts: [{ kind: "humidity", severity: "warning", room: "Wohnzimmer", value: 31, message: "Luft zu trocken (31 %) – befeuchten" }],
+    alerts: [{ kind: "humidity", severity: "warning", direction: "low", room: "Wohnzimmer", value: 31, message: "Luft zu trocken (31 %) – befeuchten" }],
     rooms: [
       { name: "Wohnzimmer", climate: { temperature: 21.3, humidity: 44.6, status: "ok" }, plants: [plant("Monstera", "ok")] },
       { name: "Ohne Raum", climate: null, plants: [plant("Efeutute", "water_now", { hints: [{ severity: "warning", message: "Gießen" }] })] },

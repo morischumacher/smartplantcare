@@ -50,7 +50,7 @@ export const REMIND_AFTER = 24 * HOUR;
 export const RESEND_GAP = 12 * HOUR;
 export const SENSOR_SILENT_AFTER = 6 * HOUR;
 /** plant hints worth a push; info hints stay in the app */
-const PUSH_HINTS = new Set(["stays_wet", "dries_fast", "no_recovery"]);
+const PUSH_HINTS = new Set(["stays_wet", "dries_fast", "no_recovery", "too_cold", "too_hot"]);
 
 export function collectEvents(summary: NotifyInput, sensors: NotifySensor[], now: number): NotifyEvent[] {
   const events: NotifyEvent[] = [];
