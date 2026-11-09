@@ -68,7 +68,7 @@ esphome logs plant-gateway.yaml     # nur Logs ansehen
 
 ## Knopf und LED
 
-Im normalen Betrieb bleibt die LED aus. **Gedimmtes Rot** heißt: kein WLAN, oder der letzte Upload ist fehlgeschlagen.
+Im normalen Betrieb bleibt die LED aus. **Gedimmtes Rot** heißt: seit 25 Minuten ist nichts in Supabase angekommen (kein WLAN, Uploads schlagen fehl oder kein Sensor in Reichweite). Ein einzelner fehlgeschlagener Upload zählt nicht.
 
 | Knopf | Wirkung |
 | --- | --- |

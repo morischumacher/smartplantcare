@@ -27,10 +27,6 @@ wifi:
   ap:
     ssid: Plant-Gateway-Setup
     password: !secret fallback_ap_password
-  on_connect:
-    - script.execute: led_idle
-  on_disconnect:
-    - script.execute: led_idle
 
 captive_portal:
 
@@ -63,15 +59,28 @@ interval:
             - script.execute:
                 id: upload
                 feedback: false
+  - interval: 30s
+    then:
+      - if:
+          condition:
+            not:
+              script.is_running: led_show
+          then:
+            - script.execute: led_idle
 
 globals:
-  # true after a failed upload until the next one succeeds; the LED then glows dim red
+  # result of the latest upload, for the button feedback
   - id: upload_failed
     type: bool
     initial_value: "false"
+  # millis() of the last successful upload (0 = since boot)
+  - id: last_ok_ms
+    type: uint32_t
+    initial_value: "0"
 
-# The LED stays dark in normal operation (it sits in a living room). Dim red = something is wrong
-# (no Wi-Fi or the last upload failed). The button shows short colour feedback, see below.
+# The LED stays dark in normal operation (it sits in a living room). Dim red = nothing reached
+# Supabase for 25 minutes (no Wi-Fi, uploads failing, or no sensor in range); a single failed
+# upload doesn't count. The button shows short colour feedback, see below.
 light:
   - platform: esp32_rmt_led_strip
     id: led
@@ -140,7 +149,9 @@ script:
           capture_response: true
           on_response:
             then:
-              - lambda: id(upload_failed) = response->status_code != 200;
+              - lambda: |-
+                  id(upload_failed) = response->status_code != 200;
+                  if (!id(upload_failed)) id(last_ok_ms) = millis();
               - logger.log:
                   level: INFO
                   format: "ingest: HTTP %d %s"
@@ -184,7 +195,7 @@ script:
     then:
       - if:
           condition:
-            lambda: return id(upload_failed) || !wifi::global_wifi_component->is_connected();
+            lambda: return millis() - id(last_ok_ms) > 25 * 60 * 1000;
           then:
             - light.turn_on: { id: led, brightness: 50%, red: 1.0, green: 0.0, blue: 0.0 }
           else:
