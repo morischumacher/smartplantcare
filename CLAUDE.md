@@ -79,7 +79,7 @@ npm run build && npm run lint && npm test   # test: IFC-Umrechnung (src/lib/*.te
 ## Stand
 
 - [x] Schritt 1: Schema + `ingest`
-- [ ] Schritt 2: ESPHome auf dem Atom Lite – Firmware fertig und kompiliert, Test mit echter Hardware steht aus
+- [x] Schritt 2: ESPHome auf dem Atom Lite – läuft im WLAN und sendet an `ingest`; Knopf = sofort senden, LED = Status (siehe `firmware/README.md`); Updates per OTA an `plant-gateway.local`
 - [x] Schritt 3: `summary` + Gieß-Logik (Lernen, Umtopfen, Gießen erkennen), Foto-Tagebuch + KI-Check (`analyze-photo`)
 - [x] Schritt 4: Web-App – live auf https://smartplantcare-umber.vercel.app (Vercel-Projekt `smartplantcare`, Root `web`, Deploy bei Push auf `main`)
 - [x] Schritt 5: ntfy – `notify` per pg_cron alle 15 Min., Topic und Ruhezeit in der Web-App (Einstellungen)
