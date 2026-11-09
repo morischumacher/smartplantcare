@@ -27,6 +27,10 @@ wifi:
   ap:
     ssid: Plant-Gateway-Setup
     password: !secret fallback_ap_password
+  on_connect:
+    - script.execute: led_idle
+  on_disconnect:
+    - script.execute: led_idle
 
 captive_portal:
 
@@ -56,21 +60,132 @@ interval:
               - wifi.connected:
               - lambda: return plant_ble::store().fresh_count() > 0;
           then:
-            - http_request.post:
-                url: !secret ingest_url
-                request_headers:
-                  Content-Type: application/json
-                  x-device-secret: !secret ingest_secret
-                body: !lambda return plant_ble::store().take_json();
-                capture_response: true
-                on_response:
-                  then:
-                    - logger.log:
-                        level: INFO
-                        format: "ingest: HTTP %d %s"
-                        args: [response->status_code, body.c_str()]
-                on_error:
-                  then:
-                    - logger.log:
-                        level: WARN
-                        format: "ingest: request failed"
+            - script.execute:
+                id: upload
+                feedback: false
+
+globals:
+  # true after a failed upload until the next one succeeds; the LED then glows dim red
+  - id: upload_failed
+    type: bool
+    initial_value: "false"
+
+# The LED stays dark in normal operation (it sits in a living room). Dim red = something is wrong
+# (no Wi-Fi or the last upload failed). The button shows short colour feedback, see below.
+light:
+  - platform: esp32_rmt_led_strip
+    id: led
+    pin: GPIO27
+    chipset: SK6812
+    rgb_order: GRB
+    num_leds: 1
+    default_transition_length: 0s
+    restore_mode: ALWAYS_OFF
+
+# Button: short press = send now (handy right after watering, the app shows it immediately);
+# hold 5 s = restart.
+#   blue   sending          green  sent
+#   yellow no sensor heard since the last upload
+#   red    no Wi-Fi or upload failed
+binary_sensor:
+  - platform: gpio
+    id: button
+    pin:
+      number: GPIO39
+      inverted: true
+    filters:
+      - delayed_on: 10ms
+    on_click:
+      - min_length: 50ms
+        max_length: 2s
+        then:
+          - if:
+              condition:
+                not:
+                  wifi.connected:
+              then:
+                - script.execute: { id: led_show, r: 1.0, g: 0.0, b: 0.0 }
+              else:
+                - if:
+                    condition:
+                      lambda: return plant_ble::store().fresh_count() == 0;
+                    then:
+                      - script.execute: { id: led_show, r: 1.0, g: 0.6, b: 0.0 }
+                    else:
+                      - light.turn_on: { id: led, brightness: 100%, red: 0.0, green: 0.3, blue: 1.0 }
+                      # the upload blocks the main loop, so let the LED update first
+                      - delay: 100ms
+                      - script.execute:
+                          id: upload
+                          feedback: true
+      - min_length: 5s
+        max_length: 60s
+        then:
+          - light.turn_on: { id: led, brightness: 100%, red: 0.6, green: 0.0, blue: 1.0 }
+          - delay: 300ms
+          - lambda: App.safe_reboot();
+
+script:
+  - id: upload
+    mode: single
+    parameters:
+      feedback: bool
+    then:
+      - http_request.post:
+          url: !secret ingest_url
+          request_headers:
+            Content-Type: application/json
+            x-device-secret: !secret ingest_secret
+          body: !lambda return plant_ble::store().take_json();
+          capture_response: true
+          on_response:
+            then:
+              - lambda: id(upload_failed) = response->status_code != 200;
+              - logger.log:
+                  level: INFO
+                  format: "ingest: HTTP %d %s"
+                  args: [response->status_code, body.c_str()]
+          on_error:
+            then:
+              - lambda: id(upload_failed) = true;
+              - logger.log:
+                  level: WARN
+                  format: "ingest: request failed"
+      - if:
+          condition:
+            lambda: return feedback;
+          then:
+            - script.execute:
+                id: led_show
+                r: !lambda "return id(upload_failed) ? 1.0f : 0.0f;"
+                g: !lambda "return id(upload_failed) ? 0.0f : 0.8f;"
+                b: 0.0
+          else:
+            - script.execute: led_idle
+
+  # A colour for 2 seconds, then back to the resting state.
+  - id: led_show
+    mode: restart
+    parameters:
+      r: float
+      g: float
+      b: float
+    then:
+      - light.turn_on:
+          id: led
+          brightness: 100%
+          red: !lambda return r;
+          green: !lambda return g;
+          blue: !lambda return b;
+      - delay: 2s
+      - script.execute: led_idle
+
+  - id: led_idle
+    then:
+      - if:
+          condition:
+            lambda: return id(upload_failed) || !wifi::global_wifi_component->is_connected();
+          then:
+            - light.turn_on: { id: led, brightness: 50%, red: 1.0, green: 0.0, blue: 0.0 }
+          else:
+            - light.turn_off: led

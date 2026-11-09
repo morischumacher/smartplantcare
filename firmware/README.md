@@ -66,6 +66,15 @@ esphome run plant-gateway.yaml      # bei der Gerätefrage "plant-gateway.local"
 esphome logs plant-gateway.yaml     # nur Logs ansehen
 ```
 
+## Knopf und LED
+
+Im normalen Betrieb bleibt die LED aus. **Gedimmtes Rot** heißt: kein WLAN, oder der letzte Upload ist fehlgeschlagen.
+
+| Knopf | Wirkung |
+| --- | --- |
+| kurz drücken | sofort senden, z. B. direkt nach dem Gießen. LED: blau = sendet, grün = angekommen, gelb = seit dem letzten Senden kein Sensor empfangen, rot = kein WLAN oder Fehler |
+| 5 Sekunden halten | Neustart (LED lila) |
+
 ## Prüfen, ob alles läuft
 
 In den Logs erscheint alle 10 Minuten (sobald Sensoren in Reichweite sind):
