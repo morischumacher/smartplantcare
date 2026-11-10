@@ -1,6 +1,7 @@
 import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.Math;
+import Toybox.Time;
 
 // Drawing helpers shared by the list and the detail pages (foreground only).
 module PlantsDraw {
@@ -67,6 +68,15 @@ module PlantsDraw {
         dc.clear();
         text(dc, w / 2, h * 0.42, Graphics.FONT_SMALL, fit(dc, title, Graphics.FONT_SMALL, w * 0.8), PlantsData.TEXT, CENTER);
         text(dc, w / 2, h * 0.56, Graphics.FONT_XTINY, line, PlantsData.GREY, CENTER);
+    }
+
+    // footer: how old the stored data is
+    function age(data as Dictionary?) as String {
+        if (data == null || data["received"] == null) {
+            return "";
+        }
+        var min = (Time.now().value() - (data["received"] as Number)) / 60;
+        return min < 1 ? "gerade eben" : min < 60 ? "vor " + min + " Min." : "vor " + (min / 60) + " Std.";
     }
 
     function errorText(code as Number) as String {

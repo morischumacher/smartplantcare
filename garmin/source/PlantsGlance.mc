@@ -2,8 +2,10 @@ import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.WatchUi;
 
-// Glance in the widget loop: "2 Pflanzen gießen" and the most urgent plant with its moisture,
-// or a climate alert ("Wohnzimmer: Luft zu trocken" and what to do).
+// Glance in the widget loop, two lines:
+//   what matters most ("Efeutute gießen", "Mein Zimmer: Luft zu trocken", "Alles in Ordnung")
+//   the room climate and when the next plant is due ("20,7° · 50 %  ·  Efeutute in 5 Tagen")
+// A thin bar on the left carries the colour of the headline.
 (:glance)
 class PlantsGlance extends WatchUi.GlanceView {
     function initialize() {
@@ -12,34 +14,50 @@ class PlantsGlance extends WatchUi.GlanceView {
 
     function onUpdate(dc as Graphics.Dc) as Void {
         var data = PlantsData.load();
-        var list = PlantsData.plants(data);
+        var w = dc.getWidth();
         var h = dc.getHeight();
+        var justify = Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER;
 
-        dc.setColor(PlantsData.TEXT, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(0, h / 4, Graphics.FONT_GLANCE, PlantsData.headline(data), Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-
-        if (list.size() == 0) {
-            return;
-        }
-        var top = list[0] as Dictionary;
-        var status = top["status"] as String;
-        var room = PlantsData.alertRoom(data);
-        var line;
-        var color;
-        if (!status.equals("water_now") && room != null) {
-            line = room["alert"] as String;
-            color = PlantsData.roomColor(room);
-        } else if (status.equals("ok")) {
-            line = list.size() + " Pflanzen im grünen Bereich";
-            color = PlantsData.GREEN;
-        } else {
-            var m = top["moisture"];
-            line = (top["name"] as String) + " · " + (m == null ? "–" : (m as Numeric).format("%d") + " %");
-            color = PlantsData.color(status);
+        var color = PlantsData.GREEN;
+        if (data == null || PlantsData.plants(data).size() == 0) {
+            color = PlantsData.GREY;
+        } else if (PlantsData.countStatus(data, "water_now") > 0) {
+            color = PlantsData.RED;
+        } else if (PlantsData.alertRoom(data) != null) {
+            color = PlantsData.roomColor(PlantsData.alertRoom(data) as Dictionary);
+        } else if (PlantsData.countStatus(data, "water_soon") > 0) {
+            color = PlantsData.OCHRE;
+        } else if (PlantsData.countStatus(data, "no_data") == PlantsData.plants(data).size()) {
+            color = PlantsData.GREY;
         }
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-        dc.fillCircle(5, h * 3 / 4, 5);
+        dc.fillRoundedRectangle(0, h * 0.12, 5, h * 0.76, 2);
+
+        dc.setColor(PlantsData.TEXT, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(14, h * 0.3, Graphics.FONT_GLANCE, fit(dc, PlantsData.headline(data), w - 14), justify);
+
+        var parts = "";
+        var rooms = PlantsData.rooms(data);
+        if (rooms.size() > 0) {
+            parts = PlantsData.climateShort(rooms[0] as Dictionary);
+        }
+        var next = PlantsData.nextPlant(data);
+        if (next != null) {
+            var n = next as Dictionary;
+            parts = parts + (parts.length() > 0 ? "  ·  " : "") + (n["name"] as String) + " " + PlantsData.inHours(n["next_h"] as Number?);
+        }
         dc.setColor(PlantsData.GREY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(16, h * 3 / 4, Graphics.FONT_GLANCE, line, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(14, h * 0.72, Graphics.FONT_GLANCE, fit(dc, parts, w - 14), justify);
+    }
+
+    function fit(dc as Graphics.Dc, s as String, maxWidth as Numeric) as String {
+        var n = s.length();
+        if (dc.getTextWidthInPixels(s, Graphics.FONT_GLANCE) <= maxWidth) {
+            return s;
+        }
+        while (n > 1 && dc.getTextWidthInPixels(s.substring(0, n) + "…", Graphics.FONT_GLANCE) > maxWidth) {
+            n--;
+        }
+        return s.substring(0, n) + "…";
     }
 }

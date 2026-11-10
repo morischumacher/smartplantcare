@@ -47,6 +47,10 @@ export interface DetailPlant {
   light_peak_7d: number | null;
   target: { min: number; max: number };
   temp_target: { min: number | null; max: number | null };
+  light_target?: { min: number | null; max: number | null };
+  ec_target?: { min: number | null; max: number | null };
+  light_season?: { min: number | null; max: number | null } | null;
+  winter?: "pause" | "rest" | null;
   recommended_ml: number | null;
   next_watering_at: string | null;
   last_watering: { ts: string; amount_ml: number } | null;
@@ -80,7 +84,15 @@ export function plantDetail(
     temp_min: p.temp_target.min,
     temp_max: p.temp_target.max,
     light: p.light_peak_7d ?? p.light,
+    light_min: p.light_target?.min ?? null,
+    light_max: p.light_target?.max ?? null,
+    // what is normal for this month (winter only), drawn as a second band
+    light_season_min: p.light_season?.min ?? null,
+    light_season_max: p.light_season?.max ?? null,
     ec: p.conductivity,
+    // in the winter pause no fertiliser is needed: no lower limit (0)
+    ec_min: p.winter ? 0 : p.ec_target?.min ?? null,
+    ec_max: p.ec_target?.max ?? null,
     ml: p.recommended_ml,
     next_h: hoursFrom(p.next_watering_at, now),
     last_h: p.last_watering ? -hoursFrom(p.last_watering.ts, now)! : null,
@@ -90,6 +102,7 @@ export function plantDetail(
     dry_rate: rate === null ? null : round1(rate),
     ml_per_point: p.learning.ml_per_point === null ? null : round1(p.learning.ml_per_point),
     samples: p.learning.samples,
+    winter: p.winter ?? null,
     hint: p.hints.find((h) => h.severity === "warning")?.message ?? null,
     // weekday of each 24-hour block of the series, for the x axis
     days: Array.from({ length: PLANT_HISTORY_DAYS }, (_, i) => weekday(from + (i + 0.5) * DAY)),

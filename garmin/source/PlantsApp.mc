@@ -23,8 +23,8 @@ class PlantsApp extends Application.AppBase {
     }
 
     function getInitialView() as [WatchUi.Views] or [WatchUi.Views, WatchUi.InputDelegates] {
-        var view = new PlantsView();
-        return [view, new PlantsDelegate(view)];
+        var view = new OverviewView();
+        return [view, new OverviewDelegate(view)];
     }
 
     (:glance)

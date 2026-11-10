@@ -15,6 +15,7 @@ import { secretsMatch } from "../ingest/validate.ts";
 import { climateAlerts, plantTemperatureHint } from "../_shared/climate.ts";
 import { compactSummary } from "../_shared/compact.ts";
 import { plantDetail, roomDetail } from "../_shared/detail.ts";
+import { seasonTargets, winterNote } from "../_shared/season.ts";
 import { type HourPoint, type PlantInput, type PlantSummary, type Pot, type PotPeriod, potVolumeL, summarize } from "../_shared/watering.ts";
 
 const supabase = createClient(
@@ -71,14 +72,16 @@ function climateStatus(humidity: number | null, min: number, max: number) {
 type History = Map<string, { series: HourPoint[]; waterings: { ts: number }[] }>;
 
 async function buildSummary(now: number, history: History = new Map()) {
-  const [rooms, plants, pots, links, latest, photos] = await Promise.all([
+  const [rooms, plants, pots, links, latest, photos, species] = await Promise.all([
     query(supabase.from("rooms").select("id, name, humidity_min, humidity_max, floor_plan").order("name")),
-    query(supabase.from("plants").select("id, name, species, room_id, moisture_min, moisture_max, temp_min_c, temp_max_c, photo_interval_days, created_at, map_x, map_y, map_height_m").is("archived_at", null).order("name")),
+    query(supabase.from("plants").select("id, name, species, species_id, room_id, moisture_min, moisture_max, temp_min_c, temp_max_c, light_min_lux, light_max_lux, conductivity_min, conductivity_max, photo_interval_days, created_at, map_x, map_y, map_height_m").is("archived_at", null).order("name")),
     query(supabase.from("pots").select("plant_id, started_at, volume_l, diameter_cm, soil_type").order("started_at", { ascending: false })),
     query(supabase.from("plant_sensors").select("plant_id, sensor_id")),
     query(supabase.from("sensor_latest").select("sensor_id, type, room_id, ts, moisture, temperature, light, conductivity, humidity")),
     query(supabase.from("plant_photos").select("plant_id, taken_at, analysis").order("taken_at", { ascending: false })),
+    query(supabase.from("species").select("id, winter_rest, winter_moisture_min")),
   ]);
+  const speciesById = new Map(species.map((s) => [s.id, s]));
 
   const latestBySensor = new Map(latest.map((r) => [r.sensor_id, r]));
 
@@ -121,8 +124,22 @@ async function buildSummary(now: number, history: History = new Map()) {
     const moisture = avg("moisture");
     const lastPhoto = photos.find((x) => x.plant_id === plant.id);
 
+    // winter pause / rest: targets for now (moisture threshold, temperature, light, fertiliser)
+    const lightPeak = dailyPeakLight(hourly, now);
+    const sp = plant.species_id ? speciesById.get(plant.species_id) : undefined;
+    const season = seasonTargets({
+      moisture: { min: Number(plant.moisture_min), max: Number(plant.moisture_max) },
+      temp: { min: num(plant.temp_min_c), max: num(plant.temp_max_c) },
+      light: { min: num(plant.light_min_lux), max: num(plant.light_max_lux) },
+      ec: { min: num(plant.conductivity_min), max: num(plant.conductivity_max) },
+      winter_rest: sp?.winter_rest ?? false,
+      winter_moisture_min: num(sp?.winter_moisture_min ?? null),
+      light_peak: lightPeak,
+      now,
+    });
+
     const input: PlantInput = {
-      moisture_min: Number(plant.moisture_min),
+      moisture_min: season.moisture.min,
       moisture_max: Number(plant.moisture_max),
       photo_interval_days: plant.photo_interval_days,
       current: { pot: currentPot, ...slice(currentFrom, Infinity) },
@@ -155,9 +172,14 @@ async function buildSummary(now: number, history: History = new Map()) {
       temperature: avg("temperature"),
       light: avg("light"),
       conductivity: avg("conductivity"),
-      light_peak_7d: dailyPeakLight(hourly, now),
+      light_peak_7d: lightPeak,
       target: { min: input.moisture_min, max: input.moisture_max },
-      temp_target: { min: num(plant.temp_min_c), max: num(plant.temp_max_c) },
+      temp_target: season.temp,
+      light_target: season.light,
+      light_season: season.light_season,
+      ec_target: season.ec,
+      winter: season.winter,
+      winter_note: winterNote(season.winter),
       status: s.status,
       recommended_ml: s.recommended_ml,
       next_watering_at: iso(s.next_watering_at),

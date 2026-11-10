@@ -1,62 +1,22 @@
-import Toybox.Application;
 import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.System;
-import Toybox.Time;
 import Toybox.WatchUi;
 
-// Opened from the glance: the rooms with their climate on top, then the plants by urgency, each
-// with a status dot, what to do and the moisture. Up/down selects, Start (or a tap) opens the
-// room or plant.
+// The plants by urgency, opened from the overview. Each row: a ring filled to the moisture in the
+// status colour with the value inside, the name and what to do. Up/down selects, Start (or a tap)
+// opens the plant. Data is loaded by the overview.
 class PlantsView extends WatchUi.View {
     const ROWS = 4;
     var selected as Number = 0;
     var offset as Number = 0;
-    var loading as Boolean = false;
-    var error as String? = null;
 
     function initialize() {
         View.initialize();
     }
 
-    function onShow() as Void {
-        // coming back from a detail page: only reload when the data is older than a minute
-        var data = PlantsData.load();
-        if (data == null || data["received"] == null || Time.now().value() - (data["received"] as Number) > 60) {
-            refresh();
-        }
-    }
-
-    function refresh() as Void {
-        loading = true;
-        error = null;
-        WatchUi.requestUpdate();
-        PlantsData.fetch(method(:onReceive));
-    }
-
-    function onReceive(responseCode as Number, data as Dictionary or String or Null) as Void {
-        loading = false;
-        if (responseCode == 200 && data instanceof Dictionary) {
-            Application.Storage.setValue(PlantsData.KEY, PlantsData.slim(data));
-        } else {
-            error = PlantsDraw.errorText(responseCode);
-        }
-        WatchUi.requestUpdate();
-    }
-
-    // rooms first, then plants; each row is [kind, data]
     function rows() as Array {
-        var data = PlantsData.load();
-        var out = [];
-        var rooms = PlantsData.rooms(data);
-        for (var i = 0; i < rooms.size(); i++) {
-            out.add(["room", rooms[i]]);
-        }
-        var plants = PlantsData.plants(data);
-        for (var i = 0; i < plants.size(); i++) {
-            out.add(["plant", plants[i]]);
-        }
-        return out;
+        return PlantsData.plants(PlantsData.load());
     }
 
     function move(by as Number) as Void {
@@ -76,9 +36,8 @@ class PlantsView extends WatchUi.View {
     // index of the row at a tap position, or -1
     function rowAt(y as Numeric) as Number {
         var h = System.getDeviceSettings().screenHeight;
-        var i = ((y - h * 0.24) / (h * 0.15)).toNumber();
-        var n = rows().size();
-        return y < h * 0.24 || i >= ROWS || offset + i >= n ? -1 : offset + i;
+        var i = ((y - h * 0.22) / (h * 0.16)).toNumber();
+        return y < h * 0.22 || i >= ROWS || offset + i >= rows().size() ? -1 : offset + i;
     }
 
     function open(index as Number) as Void {
@@ -87,15 +46,8 @@ class PlantsView extends WatchUi.View {
             return;
         }
         selected = index;
-        var row = all[index] as Array;
-        var item = row[1] as Dictionary;
-        if (item["id"] == null) {
-            return;
-        }
-        if ((row[0] as String).equals("room")) {
-            var view = new RoomView(item);
-            WatchUi.pushView(view, new RoomDelegate(view), WatchUi.SLIDE_LEFT);
-        } else {
+        var item = all[index] as Dictionary;
+        if (item["id"] != null) {
             var view = new PlantDetailView(item);
             WatchUi.pushView(view, new PlantDetailDelegate(view), WatchUi.SLIDE_LEFT);
         }
@@ -104,7 +56,6 @@ class PlantsView extends WatchUi.View {
     function onUpdate(dc as Graphics.Dc) as Void {
         var w = dc.getWidth();
         var h = dc.getHeight();
-        var data = PlantsData.load();
         var all = rows();
         if (selected >= all.size()) {
             selected = 0;
@@ -113,47 +64,47 @@ class PlantsView extends WatchUi.View {
 
         dc.setColor(PlantsData.TEXT, Graphics.COLOR_BLACK);
         dc.clear();
-        PlantsDraw.text(dc, w / 2, h * 0.13, Graphics.FONT_XTINY, PlantsData.headline(data), PlantsData.GREY, PlantsDraw.CENTER);
+        PlantsDraw.text(dc, w / 2, h * 0.13, Graphics.FONT_XTINY, "Pflanzen", PlantsData.GREY, PlantsDraw.CENTER);
 
-        var rowH = h * 0.15;
-        var top = h * 0.24;
+        var rowH = h * 0.16;
+        var top = h * 0.22;
+        var r = rowH * 0.36;
         for (var i = 0; i < ROWS && offset + i < all.size(); i++) {
-            var row = all[offset + i] as Array;
-            var item = row[1] as Dictionary;
-            var isRoom = (row[0] as String).equals("room");
+            var item = all[offset + i] as Dictionary;
             var y = top + i * rowH + rowH / 2;
             if (offset + i == selected) {
                 dc.setColor(0x1B1A17, Graphics.COLOR_TRANSPARENT);
                 dc.fillRoundedRectangle(w * 0.08, y - rowH / 2 + 2, w * 0.84, rowH - 4, rowH / 2 - 2);
             }
-            var color = isRoom ? PlantsData.roomColor(item) : PlantsData.color(item["status"] as String);
-            dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-            dc.fillCircle(w * 0.15, y, 7);
-
-            var right = w * 0.86;
-            if (!isRoom && item["moisture"] != null) {
-                var m = (item["moisture"] as Numeric).format("%d") + " %";
-                PlantsDraw.text(dc, right, y, Graphics.FONT_TINY, m, color, PlantsDraw.RIGHT);
-                right -= dc.getTextWidthInPixels(m, Graphics.FONT_TINY) + w * 0.03;
+            var color = PlantsData.color(item["status"] as String);
+            var cx = w * 0.12 + r + 4;
+            var m = item["moisture"];
+            // moisture ring: track, then the value in the status colour, clockwise from 12 o'clock
+            dc.setPenWidth(4);
+            dc.setColor(PlantsData.TRACK, Graphics.COLOR_TRANSPARENT);
+            dc.drawCircle(cx, y, r);
+            if (m != null && (m as Numeric) > 0) {
+                var deg = (360 * PlantsDraw.clamp((m as Numeric).toFloat() / 100)).toNumber();
+                dc.setColor(color, Graphics.COLOR_TRANSPARENT);
+                if (deg >= 360) {
+                    dc.drawCircle(cx, y, r);
+                } else {
+                    dc.drawArc(cx, y, r, Graphics.ARC_CLOCKWISE, 90, PlantsDraw.norm(90 - deg));
+                }
             }
-            var maxW = right - w * 0.21;
-            var name = PlantsDraw.fit(dc, item["name"] as String, Graphics.FONT_XTINY, maxW);
-            var line = isRoom ? (item["alert"] != null ? item["alert"] as String : PlantsData.roomLine(item)) : PlantsData.plantLine(item);
-            PlantsDraw.text(dc, w * 0.21, y - rowH * 0.2, Graphics.FONT_XTINY, name, PlantsData.TEXT, PlantsDraw.LEFT);
-            PlantsDraw.text(dc, w * 0.21, y + rowH * 0.22, Graphics.FONT_XTINY, PlantsDraw.fit(dc, line, Graphics.FONT_XTINY, maxW),
-                isRoom && item["alert"] != null ? color : PlantsData.GREY, PlantsDraw.LEFT);
-        }
+            dc.setPenWidth(1);
+            PlantsDraw.text(dc, cx, y, Graphics.FONT_XTINY, m == null ? "–" : (m as Numeric).format("%d"), m == null ? PlantsData.DIM : PlantsData.TEXT, PlantsDraw.CENTER);
 
-        var foot = loading ? "lädt…" : error != null ? error : age(data);
-        PlantsDraw.text(dc, w / 2, h * 0.9, Graphics.FONT_XTINY, foot, PlantsData.DIM, PlantsDraw.CENTER);
-    }
-
-    function age(data as Dictionary?) as String {
-        if (data == null || data["received"] == null) {
-            return "";
+            var x = cx + r + w * 0.04;
+            var maxW = w * 0.9 - x;
+            PlantsDraw.text(dc, x, y - rowH * 0.19, Graphics.FONT_XTINY, PlantsDraw.fit(dc, item["name"] as String, Graphics.FONT_XTINY, maxW), PlantsData.TEXT, PlantsDraw.LEFT);
+            PlantsDraw.text(dc, x, y + rowH * 0.21, Graphics.FONT_XTINY, PlantsDraw.fit(dc, PlantsData.plantLine(item), Graphics.FONT_XTINY, maxW),
+                (item["status"] as String).equals("ok") || (item["status"] as String).equals("no_data") ? PlantsData.GREY : color, PlantsDraw.LEFT);
         }
-        var min = (Time.now().value() - (data["received"] as Number)) / 60;
-        return min < 1 ? "gerade eben" : min < 60 ? "vor " + min + " Min." : "vor " + (min / 60) + " Std.";
+        if (all.size() == 0) {
+            PlantsDraw.text(dc, w / 2, h / 2, Graphics.FONT_XTINY, "noch keine Pflanzen", PlantsData.GREY, PlantsDraw.CENTER);
+        }
+        PlantsDraw.text(dc, w / 2, h * 0.9, Graphics.FONT_XTINY, PlantsDraw.age(PlantsData.load()), PlantsData.DIM, PlantsDraw.CENTER);
     }
 }
 
@@ -185,12 +136,6 @@ class PlantsDelegate extends WatchUi.BehaviorDelegate {
         if (i >= 0) {
             view.open(i);
         }
-        return true;
-    }
-
-    // long press / menu: reload now
-    function onMenu() as Boolean {
-        view.refresh();
         return true;
     }
 }

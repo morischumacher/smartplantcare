@@ -96,14 +96,14 @@ module PlantsData {
         return (room["name"] as String) + ": " + (i == null ? text : text.substring(0, i));
     }
 
-    // Most urgent first: water now, climate, water soon.
+    // Most urgent first: water now, climate, water soon. Plants without a sensor don't count.
     function headline(data as Dictionary?) as String {
         if (data == null) {
             return "Keine Daten";
         }
         var now = countStatus(data, "water_now");
         if (now > 0) {
-            return now == 1 ? "1 Pflanze gießen" : now + " Pflanzen gießen";
+            return now == 1 ? firstName(data, "water_now") + " gießen" : now.toString() + " Pflanzen gießen";
         }
         var room = alertRoom(data);
         if (room != null) {
@@ -111,13 +111,39 @@ module PlantsData {
         }
         var soon = countStatus(data, "water_soon");
         if (soon > 0) {
-            return soon == 1 ? "1 Pflanze bald" : soon + " Pflanzen bald";
+            return soon == 1 ? firstName(data, "water_soon") + " bald gießen" : soon.toString() + " bald gießen";
         }
         var all = plants(data);
         if (all.size() > 0 && countStatus(data, "no_data") == all.size()) {
             return "Keine Sensordaten";
         }
-        return "Alles gut";
+        return "Alles in Ordnung";
+    }
+
+    function firstName(data as Dictionary?, status as String) as String {
+        var all = plants(data);
+        for (var i = 0; i < all.size(); i++) {
+            var p = all[i] as Dictionary;
+            if ((p["status"] as String).equals(status)) {
+                return p["name"] as String;
+            }
+        }
+        return "";
+    }
+
+    // the plant due next (not already "water now"), or null
+    function nextPlant(data as Dictionary?) as Dictionary? {
+        var all = plants(data);
+        var best = null;
+        for (var i = 0; i < all.size(); i++) {
+            var p = all[i] as Dictionary;
+            var h = p["next_h"];
+            if (h != null && !(p["status"] as String).equals("water_now")
+                && (best == null || (h as Number) < ((best as Dictionary)["next_h"] as Number))) {
+                best = p;
+            }
+        }
+        return best;
     }
 
     // Only what glance and list show, plus our own receive time (parsing the ISO timestamp is costly).
@@ -195,10 +221,10 @@ module PlantsData {
             return p["ml"] != null ? "Jetzt " + (p["ml"] as Numeric).format("%d") + " ml" : "Jetzt gießen";
         }
         if (status.equals("water_soon")) {
-            return "Gießen " + inHours(next);
+            return "gießen " + inHours(next);
         }
         if (status.equals("ok")) {
-            return next != null ? "ok · " + inHours(next) : "ok";
+            return next != null ? "gießen " + inHours(next) : "gut versorgt";
         }
         return "keine Messwerte";
     }
@@ -213,6 +239,16 @@ module PlantsData {
             parts = parts + (parts.length() > 0 ? " · " : "") + (r["hum"] as Numeric).format("%d") + " %";
         }
         return parts.length() > 0 ? parts : "kein Hygrometer";
+    }
+
+    // "20,7° · 50 %", for the glance
+    function climateShort(r as Dictionary) as String {
+        var t = r["temp"];
+        var hum = r["hum"];
+        if (t == null && hum == null) {
+            return "";
+        }
+        return (t == null ? "–" : dec(t as Numeric) + "°") + " · " + (hum == null ? "–" : (hum as Numeric).format("%d") + " %");
     }
 
     function color(status as String) as Number {

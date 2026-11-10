@@ -21,6 +21,11 @@ export interface PlantSummary {
   conductivity: number | null;
   light_peak_7d: number | null;
   target: { min: number; max: number };
+  /** set automatically in winter: "pause" for every plant, "rest" for species with a winter rest */
+  winter: "pause" | "rest" | null;
+  winter_note: string | null;
+  /** daily light peak that is normal this month (winter only) */
+  light_season: { min: number | null; max: number | null } | null;
   status: Status;
   recommended_ml: number | null;
   next_watering_at: string | null;

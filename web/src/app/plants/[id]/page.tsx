@@ -114,6 +114,11 @@ async function Plant({ params, searchParams }: Pick<PageProps<"/plants/[id]">, "
           <h1 className="truncate">{plant.name}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <StatusPill status={s.status} />
+            {s.winter && (
+              <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800 dark:bg-sky-900/40 dark:text-sky-200">
+                {s.winter === "rest" ? "Winterruhe" : "Winterpause"}
+              </span>
+            )}
             {plant.species && plant.species !== plant.name && <span className="text-sm text-stone-500 italic">{plant.species}</span>}
           </div>
         </div>
@@ -132,10 +137,16 @@ async function Plant({ params, searchParams }: Pick<PageProps<"/plants/[id]">, "
           <Stat icon={<ThermoIcon className="size-4" />} label="Temperatur" value={`${num(s.temperature, 1)} °C`} />
           <Stat icon={<SunIcon className="size-4" />} label="Licht" value={`${num(s.light)} lx`}>
             {light && <p className="text-xs text-stone-500">Standort: {light.label} (max. {num(s.light_peak_7d)} lx)</p>}
+            {s.light_season?.min != null && s.light_peak_7d != null && (
+              <p className="text-xs text-sky-700 dark:text-sky-300">
+                {s.light_peak_7d >= s.light_season.min ? "Für den Winter normal" : "Selbst für den Winter zu dunkel"}
+              </p>
+            )}
           </Stat>
           <Stat icon={<span className="text-xs">µS</span>} label="Dünger (Leitwert)" value={`${num(s.conductivity)} µS/cm`} />
         </div>
           {measured && <p className="mt-1.5 px-1 text-xs text-stone-500">Gemessen {relTime(measured)}</p>}
+          {s.winter_note && <p className="mt-1 px-1 text-xs text-sky-700 dark:text-sky-300">{s.winter_note}</p>}
         </div>
       )}
 

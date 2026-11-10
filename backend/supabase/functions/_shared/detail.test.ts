@@ -21,6 +21,8 @@ const plant = (over: Partial<DetailPlant> = {}): DetailPlant => ({
   light_peak_7d: 1200,
   target: { min: 35, max: 60 },
   temp_target: { min: 16, max: 28 },
+  light_target: { min: 300, max: 15000 },
+  ec_target: { min: null, max: null },
   recommended_ml: 250,
   next_watering_at: "2026-11-09T20:00:00.000Z",
   last_watering: { ts: "2026-11-03T18:00:00.000Z", amount_ml: 300 },
@@ -33,6 +35,9 @@ test("plant detail: values, rhythm and the most important hint", () => {
   const d = plantDetail(plant(), [], [], NOW);
   assert.equal(d.moisture, 31);
   assert.equal(d.light, 1200);
+  assert.equal(d.light_min, 300);
+  assert.equal(d.light_max, 15000);
+  assert.equal(d.ec_min, null);
   assert.equal(d.last_ml, 300);
   assert.equal(d.last_h, 146);
   assert.equal(d.next_h, 0);
