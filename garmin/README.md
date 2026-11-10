@@ -2,9 +2,11 @@
 
 Connect-IQ-Widget in Monkey C, nur zum Sideload:
 
-- **Glance** im Widget-Loop: „2 Pflanzen gießen“ und die dringendste Pflanze mit Feuchte.
-- **Detailansicht** beim Öffnen: Liste mit Statuspunkt, Feuchte und bei „Gießen“ der Menge. Hoch/Runter blättert, Start lädt neu.
-- Ein **Hintergrunddienst** holt alle 15 Minuten `summary?view=compact` über das gekoppelte iPhone. Glance und Liste lesen nur den Speicher, deshalb geht das auch ohne Verbindung.
+- **Glance** im Widget-Loop: „2 Pflanzen gießen“ und die dringendste Pflanze mit Feuchte, oder eine Klima-Warnung.
+- **Liste** beim Öffnen: oben die Räume mit Temperatur und Luftfeuchte, darunter die Pflanzen nach Dringlichkeit (Statuspunkt, was zu tun ist, Feuchte). Hoch/Runter wählt aus, Start oder Tippen öffnet, langes Drücken (Menü) lädt neu.
+- **Pflanze** auf vier Seiten (Hoch/Runter oder Start blättert): Status mit Feuchte-Ring, Messwerte gegen ihre Zielbereiche, Feuchte über 7 Tage mit Gieß-Markern, Gießen (nächstes Mal, Menge, zuletzt, Rhythmus, Gelerntes).
+- **Raum**: Temperatur, Luftfeuchte, Verlauf der letzten 24 Stunden.
+- Ein **Hintergrunddienst** holt alle 15 Minuten `summary?view=compact` über das gekoppelte iPhone. Glance und Liste lesen nur den Speicher, deshalb geht das auch ohne Verbindung. Pflanze und Raum (`view=plant` / `view=room`) werden erst beim Öffnen geladen.
 
 | Datei | Inhalt |
 | --- | --- |
@@ -12,6 +14,8 @@ Connect-IQ-Widget in Monkey C, nur zum Sideload:
 | `source/PlantsService.mc` | Hintergrunddienst (`onTemporalEvent` → Abruf → `Background.exit`) |
 | `source/PlantsData.mc` | Abruf, Kürzen der Antwort (max. ~8 KB für den Hintergrund), Texte und Farben |
 | `source/PlantsGlance.mc`, `source/PlantsView.mc` | Glance und Liste |
+| `source/PlantDetailView.mc`, `source/RoomView.mc` | Pflanze (vier Seiten) und Raum |
+| `source/PlantsDraw.mc` | Zeichen-Helfer (Texte kürzen, Ring, Seitenpunkte) |
 | `source/Secrets.mc` | Read-Token (gitignored, Vorlage `Secrets.mc.example`) |
 
 Sideload-Apps lassen sich nicht über Garmin Connect konfigurieren, deshalb wird das Token mit eingebaut.

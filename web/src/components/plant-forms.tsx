@@ -26,6 +26,7 @@ type Plant = {
   notes: string | null;
   species_id: string | null;
   sensor_ids: string[];
+  pots?: Pot[];
 };
 
 /** Species values that become the plant's targets. */
@@ -42,14 +43,16 @@ function Field({ label, children, className = "" }: { label: string; children: R
   );
 }
 
-function PotFields() {
+type Pot = { id: string; volume_l: number | null; diameter_cm: number | null; height_cm: number | null; soil_type: string };
+
+function PotFields({ pot }: { pot?: Pot }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <Field label="Volumen (l)"><input className="input" name="volume_l" inputMode="decimal" placeholder="z. B. 3" /></Field>
-      <Field label="Durchmesser (cm)"><input className="input" name="diameter_cm" inputMode="decimal" /></Field>
-      <Field label="Höhe (cm)"><input className="input" name="height_cm" inputMode="decimal" /></Field>
+      <Field label="Durchmesser (cm)"><input className="input" name="diameter_cm" inputMode="decimal" placeholder="oben gemessen" defaultValue={pot?.diameter_cm ?? ""} /></Field>
+      <Field label="Volumen (l)"><input className="input" name="volume_l" inputMode="decimal" placeholder="falls bekannt" defaultValue={pot?.volume_l ?? ""} /></Field>
+      <Field label="Höhe (cm)"><input className="input" name="height_cm" inputMode="decimal" defaultValue={pot?.height_cm ?? ""} /></Field>
       <Field label="Erde">
-        <select className="input" name="soil_type" defaultValue="universal">
+        <select className="input" name="soil_type" defaultValue={pot?.soil_type ?? "universal"}>
           {Object.entries(SOIL_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
       </Field>
@@ -175,13 +178,15 @@ export function PlantForm({
         <p className="mt-2 text-xs text-stone-500">Wird beim Wählen der Pflanzenart vorausgefüllt. Aus der Temperatur entsteht die Warnung „zu kalt“ oder „zu warm“ für den Raum.</p>
       </details>
 
-      {!plant && (
-        <fieldset>
-          <legend className="label">Topf</legend>
-          <PotFields />
-          <p className="mt-1 text-xs text-stone-500">Aus der Topfgröße schätzt die App die erste Gießmenge, bis sie es gelernt hat.</p>
-        </fieldset>
-      )}
+      <fieldset>
+        <legend className="label">Topf</legend>
+        {plant?.pots?.[0] && <input type="hidden" name="pot_id" value={plant.pots[0].id} />}
+        <PotFields pot={plant?.pots?.[0]} />
+        <p className="mt-1 text-xs text-stone-500">
+          Aus der Topfgröße schätzt die App die Gießmenge, bis sie es aus echtem Gießen gelernt hat. Der Durchmesser reicht, das Volumen wird
+          daraus geschätzt.{plant && " Neuer Topf? Dann unten „Umgetopft?“ nutzen."}
+        </p>
+      </fieldset>
 
       <fieldset>
         <legend className="label">Sensoren</legend>

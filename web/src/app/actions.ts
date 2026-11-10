@@ -93,6 +93,15 @@ export async function deleteWatering(id: string): Promise<ActionResult> {
 
 // --- Plants ----------------------------------------------------------------
 
+function potFields(fd: FormData) {
+  return {
+    volume_l: num(fd, "volume_l"),
+    diameter_cm: num(fd, "diameter_cm"),
+    height_cm: num(fd, "height_cm"),
+    soil_type: str(fd, "soil_type") ?? "universal",
+  };
+}
+
 export async function savePlant(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   const id = str(fd, "id");
   const fields = {
@@ -120,17 +129,17 @@ export async function savePlant(_prev: ActionResult | null, fd: FormData): Promi
     if (id) {
       const { error } = await supabase.from("plants").update(fields).eq("id", id);
       if (error) throw error;
+      // corrects the current pot's size; a new pot goes through repot() so learning starts over
+      const potId = str(fd, "pot_id");
+      if (potId) {
+        const { error: potError } = await supabase.from("pots").update(potFields(fd)).eq("id", potId).eq("plant_id", id);
+        if (potError) throw potError;
+      }
     } else {
       const { data, error } = await supabase.from("plants").insert(fields).select("id").single();
       if (error) throw error;
       plantId = data.id;
-      const { error: potError } = await supabase.from("pots").insert({
-        plant_id: plantId,
-        volume_l: num(fd, "volume_l"),
-        diameter_cm: num(fd, "diameter_cm"),
-        height_cm: num(fd, "height_cm"),
-        soil_type: str(fd, "soil_type") ?? "universal",
-      });
+      const { error: potError } = await supabase.from("pots").insert({ plant_id: plantId, ...potFields(fd) });
       if (potError) throw potError;
     }
     // photo used to identify the species becomes the first diary photo

@@ -222,6 +222,16 @@ export function learnDryRate(period: PotPeriod, now: number): number | null {
   return weightedMedian(samples);
 }
 
+/**
+ * Pot volume in litres; without a measured volume it is estimated from the top diameter, for a
+ * usual tapered pot about as high as it is wide (≈ 0.49 · d³).
+ */
+export function potVolumeL(volume_l: number | null, diameter_cm: number | null): number | null {
+  if (volume_l !== null) return volume_l;
+  if (diameter_cm === null || diameter_cm <= 0) return null;
+  return Math.round(0.49 * diameter_cm ** 3 / 100) / 10;
+}
+
 function formulaMlPerPoint(pot: Pot): number | null {
   if (pot.volume_l === null) return null;
   return (pot.volume_l * 1000 * SOIL_FACTOR[pot.soil_type]) / 100;

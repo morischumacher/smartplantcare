@@ -8,6 +8,7 @@ import {
   learnMlPerPoint,
   type PlantInput,
   photoRequest,
+  potVolumeL,
   type PotPeriod,
   seasonOf,
   summarize,
@@ -208,4 +209,11 @@ test("photoRequest priorities", () => {
   const dec3 = Date.parse("2026-12-03T12:00:00Z");
   assert.equal(photoRequest({ ...base, now: dec3, last_photo_at: dec3 - 5 * DAY }, [])?.reason, "season");
   assert.equal(photoRequest({ ...base, now: dec3, last_photo_at: dec3 - DAY }, []), null);
+});
+
+test("pot volume: measured value wins, else estimated from the diameter", () => {
+  assert.equal(potVolumeL(3, 20), 3);
+  assert.equal(potVolumeL(null, 12), 0.8);
+  assert.equal(potVolumeL(null, 17), 2.4);
+  assert.equal(potVolumeL(null, null), null);
 });

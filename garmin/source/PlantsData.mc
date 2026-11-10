@@ -1,22 +1,43 @@
 import Toybox.Application.Storage;
 import Toybox.Communications;
+import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.Time;
 
-// Loading and reading the compact summary:
-// { generated_at, attention, alerts: [{ room, kind, severity, message }],
-//   plants: [{ name, room, status, moisture, ml, next, hint }], rooms: [...] }
-// Stored slim: one list of rows, climate alerts as rows with status "climate_warning"/"climate_critical",
-// the room as name and the message as text.
+// Loading and reading the summary. The compact view
+//   { attention, alerts: [{ room, kind, severity, message }],
+//     plants: [{ id, name, room, status, moisture, ml, next_h, hint }], rooms: [{ id, name, humidity, temperature, status }] }
+// is stored slim: plants and rooms, each room with its most important climate alert.
+// Plant and room details (`view=plant` / `view=room`) are only loaded when opened, never stored.
 (:background :glance)
 module PlantsData {
     const KEY = "summary";
     const URL = "https://zvymcgkkjrfxqoartwrp.supabase.co/functions/v1/summary";
 
+    // "Gewächshaus" palette of the web app, slightly brighter for the black AMOLED screen
+    const RED = 0xD0643F;
+    const OCHRE = 0xD5A434;
+    const GREEN = 0x4F9A68;
+    const GREY = 0xA5A091;
+    const BLUE = 0x7FA8C9;
+    const TEXT = 0xF7F6F1;
+    const DIM = 0x6B675C;
+    const TRACK = 0x2E2C27;
+    const BAND = 0x2A3D30;
+
     function fetch(callback as Method(responseCode as Number, data as Dictionary or String or Null) as Void) as Void {
+        request({ "view" => "compact" }, callback);
+    }
+
+    // view: "plant" or "room"
+    function fetchDetail(view as String, id as String, callback as Method(responseCode as Number, data as Dictionary or String or Null) as Void) as Void {
+        request({ "view" => view, "id" => id }, callback);
+    }
+
+    function request(params as Dictionary, callback as Method(responseCode as Number, data as Dictionary or String or Null) as Void) as Void {
         Communications.makeWebRequest(
             URL,
-            { "view" => "compact" },
+            params,
             {
                 :method => Communications.HTTP_REQUEST_METHOD_GET,
                 :headers => { "x-read-token" => Secrets.SUMMARY_TOKEN },
@@ -31,33 +52,48 @@ module PlantsData {
         return data instanceof Dictionary ? data : null;
     }
 
-    function plants(data as Dictionary?) as Array {
-        if (data == null || !(data["plants"] instanceof Array)) {
+    function list(data as Dictionary?, key as String) as Array {
+        if (data == null || !(data[key] instanceof Array)) {
             return [];
         }
-        return data["plants"] as Array;
+        return data[key] as Array;
+    }
+
+    function plants(data as Dictionary?) as Array {
+        return list(data, "plants");
+    }
+
+    function rooms(data as Dictionary?) as Array {
+        return list(data, "rooms");
     }
 
     function countStatus(data as Dictionary?, status as String) as Number {
         var n = 0;
-        var list = plants(data);
-        for (var i = 0; i < list.size(); i++) {
-            if (((list[i] as Dictionary)["status"] as String).equals(status)) {
+        var all = plants(data);
+        for (var i = 0; i < all.size(); i++) {
+            if (((all[i] as Dictionary)["status"] as String).equals(status)) {
                 n++;
             }
         }
         return n;
     }
 
-    function isAlert(row as Dictionary) as Boolean {
-        return (row["status"] as String).find("climate") == 0;
+    // first room with a climate alert (alerts arrive critical first), or null
+    function alertRoom(data as Dictionary?) as Dictionary? {
+        var all = rooms(data);
+        for (var i = 0; i < all.size(); i++) {
+            if ((all[i] as Dictionary)["alert"] != null) {
+                return all[i] as Dictionary;
+            }
+        }
+        return null;
     }
 
     // "Luft zu trocken (31 %) – befeuchten" -> "Luft zu trocken"
-    function alertTitle(row as Dictionary) as String {
-        var text = row["text"] as String;
+    function alertTitle(room as Dictionary) as String {
+        var text = room["alert"] as String;
         var i = text.find(" (");
-        return (row["name"] as String) + ": " + (i == null ? text : text.substring(0, i));
+        return (room["name"] as String) + ": " + (i == null ? text : text.substring(0, i));
     }
 
     // Most urgent first: water now, climate, water soon.
@@ -69,66 +105,130 @@ module PlantsData {
         if (now > 0) {
             return now == 1 ? "1 Pflanze gießen" : now + " Pflanzen gießen";
         }
-        var list = plants(data);
-        for (var i = 0; i < list.size(); i++) {
-            if (isAlert(list[i] as Dictionary)) {
-                return alertTitle(list[i] as Dictionary);
-            }
+        var room = alertRoom(data);
+        if (room != null) {
+            return alertTitle(room);
         }
         var soon = countStatus(data, "water_soon");
         if (soon > 0) {
             return soon == 1 ? "1 Pflanze bald" : soon + " Pflanzen bald";
         }
-        if (list.size() > 0 && countStatus(data, "no_data") == list.size()) {
+        var all = plants(data);
+        if (all.size() > 0 && countStatus(data, "no_data") == all.size()) {
             return "Keine Sensordaten";
         }
         return "Alles gut";
-    }
-
-    // second line of a row: moisture, or the alert text
-    function detail(row as Dictionary) as String {
-        if (isAlert(row)) {
-            return row["text"] as String;
-        }
-        var m = row["moisture"];
-        return m == null ? "–" : m.format("%d") + " %";
     }
 
     // Only what glance and list show, plus our own receive time (parsing the ISO timestamp is costly).
     // Background.exit() carries about 8 KB at most.
     function slim(data as Dictionary) as Dictionary {
         var out = [] as Array<Dictionary>;
-        var list = plants(data);
-        var alerts = data["alerts"] instanceof Array ? data["alerts"] as Array : [];
-        // plants arrive sorted by status: water_now first, then the alerts, then the rest
-        var i = 0;
-        for (; i < list.size() && ((list[i] as Dictionary)["status"] as String).equals("water_now"); i++) {
-            out.add(slimPlant(list[i] as Dictionary));
+        var all = plants(data);
+        for (var i = 0; i < all.size() && i < 12; i++) {
+            var p = all[i] as Dictionary;
+            out.add({ "id" => p["id"], "name" => p["name"], "status" => p["status"], "moisture" => p["moisture"], "ml" => p["ml"], "next_h" => p["next_h"] });
         }
-        for (var j = 0; j < alerts.size(); j++) {
-            var a = alerts[j] as Dictionary;
-            out.add({ "name" => a["room"], "status" => "climate_" + a["severity"], "text" => a["message"] });
+        var alerts = list(data, "alerts");
+        var roomRows = [] as Array<Dictionary>;
+        var all2 = rooms(data);
+        for (var i = 0; i < all2.size() && i < 4; i++) {
+            var r = all2[i] as Dictionary;
+            var row = { "id" => r["id"], "name" => r["name"], "temp" => r["temperature"], "hum" => r["humidity"], "status" => r["status"] };
+            for (var j = 0; j < alerts.size(); j++) {
+                var a = alerts[j] as Dictionary;
+                if ((a["room"] as String).equals(r["name"] as String)) {
+                    row["alert"] = a["message"];
+                    row["severity"] = a["severity"];
+                    break;
+                }
+            }
+            roomRows.add(row);
         }
-        for (; i < list.size() && out.size() < 12; i++) {
-            out.add(slimPlant(list[i] as Dictionary));
-        }
-        return { "plants" => out, "received" => Time.now().value() };
+        return { "plants" => out, "rooms" => roomRows, "received" => Time.now().value() };
     }
 
-    function slimPlant(p as Dictionary) as Dictionary {
-        return { "name" => p["name"], "status" => p["status"], "moisture" => p["moisture"], "ml" => p["ml"] };
+    // --- texts --------------------------------------------------------------
+
+    // 21.4 -> "21,4"
+    function dec(v as Numeric) as String {
+        var s = v.format("%.1f");
+        var i = s.find(".");
+        return i == null ? s : s.substring(0, i) + "," + s.substring(i + 1, s.length());
+    }
+
+    // hours until something: "jetzt", "in 5 Std.", "morgen", "in 3 Tagen"
+    function inHours(h as Number?) as String {
+        if (h == null) {
+            return "–";
+        }
+        if (h <= 0) {
+            return "jetzt";
+        }
+        if (h < 20) {
+            return "in " + h + " Std.";
+        }
+        var d = (h + 12) / 24;
+        return d <= 1 ? "morgen" : "in " + d + " Tagen";
+    }
+
+    // hours since something: "vor 5 Std.", "gestern", "vor 6 Tagen"
+    function agoHours(h as Number?) as String {
+        if (h == null) {
+            return "–";
+        }
+        if (h < 1) {
+            return "gerade eben";
+        }
+        if (h < 20) {
+            return "vor " + h + " Std.";
+        }
+        var d = (h + 12) / 24;
+        return d <= 1 ? "gestern" : "vor " + d + " Tagen";
+    }
+
+    // second line of a plant row
+    function plantLine(p as Dictionary) as String {
+        var status = p["status"] as String;
+        var next = p["next_h"] as Number?;
+        if (status.equals("water_now")) {
+            return p["ml"] != null ? "Jetzt " + (p["ml"] as Numeric).format("%d") + " ml" : "Jetzt gießen";
+        }
+        if (status.equals("water_soon")) {
+            return "Gießen " + inHours(next);
+        }
+        if (status.equals("ok")) {
+            return next != null ? "ok · " + inHours(next) : "ok";
+        }
+        return "keine Messwerte";
+    }
+
+    // second line of a room row
+    function roomLine(r as Dictionary) as String {
+        var parts = "";
+        if (r["temp"] != null) {
+            parts = dec(r["temp"] as Numeric) + " °C";
+        }
+        if (r["hum"] != null) {
+            parts = parts + (parts.length() > 0 ? " · " : "") + (r["hum"] as Numeric).format("%d") + " %";
+        }
+        return parts.length() > 0 ? parts : "kein Hygrometer";
     }
 
     function color(status as String) as Number {
-        if (status.equals("water_now") || status.equals("climate_critical")) {
-            return 0xF43F5E;
+        if (status.equals("water_now") || status.equals("critical")) {
+            return RED;
         }
-        if (status.equals("water_soon") || status.equals("climate_warning")) {
-            return 0xF59E0B;
+        if (status.equals("water_soon") || status.equals("warning") || status.equals("too_dry") || status.equals("too_humid")) {
+            return OCHRE;
         }
         if (status.equals("ok")) {
-            return 0x10B981;
+            return GREEN;
         }
-        return 0xA8A29E;
+        return GREY;
+    }
+
+    function roomColor(r as Dictionary) as Number {
+        return r["severity"] != null ? color(r["severity"] as String) : color(r["status"] as String);
     }
 }

@@ -2,8 +2,10 @@
 // hint lists – a Garmin background service has only a few KB for the response. Pure logic.
 
 import type { ClimateAlert } from "./climate.ts";
+import { hoursFrom } from "./detail.ts";
 
 export interface FullPlant {
+  id: string;
   name: string;
   status: string;
   moisture: number | null;
@@ -13,6 +15,7 @@ export interface FullPlant {
 }
 
 export interface FullRoom {
+  id: string | null;
   name: string;
   climate: { temperature: number | null; humidity: number | null; status: string } | null;
   plants: FullPlant[];
@@ -22,16 +25,19 @@ const STATUS_ORDER: Record<string, number> = { water_now: 0, water_soon: 1, no_d
 const MAX_PLANTS = 20;
 const MAX_ALERTS = 5;
 
-export function compactSummary(full: { generated_at: string | null; attention: number; alerts: ClimateAlert[]; rooms: FullRoom[] }) {
+export function compactSummary(full: { generated_at: string | null; attention: number; alerts: ClimateAlert[]; rooms: FullRoom[] }, now = Date.now()) {
   const plants = full.rooms
     .flatMap((r) =>
       r.plants.map((p) => ({
+        id: p.id,
         name: p.name,
         room: r.name,
         status: p.status,
         moisture: p.moisture === null ? null : Math.round(p.moisture),
         ml: p.recommended_ml,
         next: p.next_watering_at,
+        // hours until then, for the Garmin list (negative = overdue)
+        next_h: hoursFrom(p.next_watering_at, now),
         // most important hint, for the widget's second line
         hint: (p.hints.find((h) => h.severity === "warning") ?? null)?.message ?? null,
       })),
@@ -47,6 +53,7 @@ export function compactSummary(full: { generated_at: string | null; attention: n
     rooms: full.rooms
       .filter((r) => r.climate)
       .map((r) => ({
+        id: r.id,
         name: r.name,
         humidity: r.climate!.humidity === null ? null : Math.round(r.climate!.humidity),
         temperature: r.climate!.temperature,

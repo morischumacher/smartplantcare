@@ -2,6 +2,8 @@
 //
 // GET /functions/v1/summary            full overview (web app)
 // GET /functions/v1/summary?view=compact   slim list for the Scriptable widget and the Garmin glance
+// GET /functions/v1/summary?view=plant&id=…  one plant with a 7-day moisture history (Garmin detail)
+// GET /functions/v1/summary?view=room&id=…   one room with its last 24 hours of climate (Garmin)
 // Header: x-read-token: <SUMMARY_TOKEN>   (widget, Garmin)
 //    or: Authorization: Bearer <user access token>   (web app)
 //
@@ -12,7 +14,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { secretsMatch } from "../ingest/validate.ts";
 import { climateAlerts, plantTemperatureHint } from "../_shared/climate.ts";
 import { compactSummary } from "../_shared/compact.ts";
-import { type HourPoint, type PlantInput, type PlantSummary, type Pot, type PotPeriod, summarize } from "../_shared/watering.ts";
+import { plantDetail, roomDetail } from "../_shared/detail.ts";
+import { type HourPoint, type PlantInput, type PlantSummary, type Pot, type PotPeriod, potVolumeL, summarize } from "../_shared/watering.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -64,11 +67,14 @@ function climateStatus(humidity: number | null, min: number, max: number) {
   return "ok";
 }
 
-async function buildSummary(now: number) {
+// Hourly moisture and waterings per plant, kept aside for the plant detail view.
+type History = Map<string, { series: HourPoint[]; waterings: { ts: number }[] }>;
+
+async function buildSummary(now: number, history: History = new Map()) {
   const [rooms, plants, pots, links, latest, photos] = await Promise.all([
     query(supabase.from("rooms").select("id, name, humidity_min, humidity_max, floor_plan").order("name")),
     query(supabase.from("plants").select("id, name, species, room_id, moisture_min, moisture_max, temp_min_c, temp_max_c, photo_interval_days, created_at, map_x, map_y, map_height_m").is("archived_at", null).order("name")),
-    query(supabase.from("pots").select("plant_id, started_at, volume_l, soil_type").order("started_at", { ascending: false })),
+    query(supabase.from("pots").select("plant_id, started_at, volume_l, diameter_cm, soil_type").order("started_at", { ascending: false })),
     query(supabase.from("plant_sensors").select("plant_id, sensor_id")),
     query(supabase.from("sensor_latest").select("sensor_id, type, room_id, ts, moisture, temperature, light, conductivity, humidity")),
     query(supabase.from("plant_photos").select("plant_id, taken_at, analysis").order("taken_at", { ascending: false })),
@@ -80,7 +86,7 @@ async function buildSummary(now: number) {
     const plantPots = pots.filter((p) => p.plant_id === plant.id);
     const toPot = (p: (typeof pots)[number] | undefined, fallbackStart: number): Pot => ({
       started_at: p ? ms(p.started_at) : fallbackStart,
-      volume_l: p ? num(p.volume_l) : null,
+      volume_l: p ? potVolumeL(num(p.volume_l), num(p.diameter_cm)) : null,
       soil_type: p?.soil_type ?? "universal",
     });
     const currentPot = toPot(plantPots[0], ms(plant.created_at));
@@ -96,6 +102,8 @@ async function buildSummary(now: number) {
 
     const series: HourPoint[] = hourly.map((h) => ({ hour: ms(h.hour), moisture: num(h.moisture) }));
     const ws = waterings.map((w) => ({ ts: ms(w.ts), amount_ml: w.amount_ml, during_vacation: w.during_vacation }));
+    history.set(plant.id, { series, waterings: ws });
+    const lastWatering = ws.reduce<(typeof ws)[number] | null>((a, w) => (a && a.ts > w.ts ? a : w), null);
     const slice = (a: number, b: number): Pick<PotPeriod, "series" | "waterings"> => ({
       series: series.filter((p) => p.hour >= a && p.hour < b),
       waterings: ws.filter((w) => w.ts >= a && w.ts < b),
@@ -153,6 +161,7 @@ async function buildSummary(now: number) {
       status: s.status,
       recommended_ml: s.recommended_ml,
       next_watering_at: iso(s.next_watering_at),
+      last_watering: lastWatering ? { ts: iso(lastWatering.ts)!, amount_ml: lastWatering.amount_ml } : null,
       learning: { ...s.learning, pot_since: iso(s.learning.pot_since) },
       pending_waterings: s.pending_waterings.map((r) => ({ ...r, ts: iso(r.ts) })),
       hints: s.hints,
@@ -240,8 +249,30 @@ Deno.serve(async (req) => {
   if (req.method !== "GET") return json(405, { error: "method not allowed" });
   if (!(await authorized(req))) return json(401, { error: "unauthorized" });
   try {
-    const summary = await buildSummary(Date.now());
-    return json(200, new URL(req.url).searchParams.get("view") === "compact" ? compactSummary(summary) : summary);
+    const params = new URL(req.url).searchParams;
+    const view = params.get("view");
+    const id = params.get("id");
+    const now = Date.now();
+    const history: History = new Map();
+    const summary = await buildSummary(now, history);
+    if (view === "compact") return json(200, compactSummary(summary, now));
+    if (view === "plant") {
+      const plant = summary.rooms.flatMap((r) => r.plants).find((p) => p.id === id);
+      if (!plant) return json(404, { error: "plant not found" });
+      const h = history.get(plant.id)!;
+      return json(200, plantDetail(plant, h.series.map((x) => ({ ts: x.hour, moisture: x.moisture })), h.waterings, now));
+    }
+    if (view === "room") {
+      const room = summary.rooms.find((r) => r.id === id);
+      if (!room) return json(404, { error: "room not found" });
+      const readings = await query(
+        supabase.from("readings").select("ts, humidity, temperature, sensors!inner(type, room_id)")
+          .eq("sensors.type", "hygrometer").eq("sensors.room_id", id)
+          .gte("ts", new Date(now - 25 * 3_600_000).toISOString()),
+      ) as { ts: string; humidity: number | null; temperature: number | null }[];
+      return json(200, roomDetail(room, readings.map((r) => ({ ts: ms(r.ts), humidity: num(r.humidity), temperature: num(r.temperature) })), now));
+    }
+    return json(200, summary);
   } catch (e) {
     console.error("summary failed", e);
     return json(500, { error: "database error" });
