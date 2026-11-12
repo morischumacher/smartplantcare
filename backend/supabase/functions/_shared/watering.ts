@@ -15,7 +15,8 @@ export interface HourPoint {
 
 export interface Watering {
   ts: number;
-  amount_ml: number;
+  /** null: watered, amount unknown (confirmed detection) */
+  amount_ml: number | null;
   during_vacation: boolean;
 }
 
@@ -181,7 +182,7 @@ export function measureWatering(series: HourPoint[], ts: number): { before: numb
 export function learnMlPerPoint(period: PotPeriod, now: number): { value: number | null; samples: number } {
   const samples: { value: number; weight: number }[] = [];
   for (const w of period.waterings) {
-    if (w.during_vacation) continue;
+    if (w.during_vacation || w.amount_ml === null) continue;
     const m = measureWatering(period.series, w.ts);
     if (!m || m.peak - m.before < 3) continue;
     samples.push({ value: w.amount_ml / (m.peak - m.before), weight: sampleWeight(w.ts, now) });

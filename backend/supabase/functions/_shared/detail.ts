@@ -57,7 +57,7 @@ export interface DetailPlant {
   year_target?: { moisture: { min: number; max: number }; temp: Range; ec: Range };
   recommended_ml: number | null;
   next_watering_at: string | null;
-  last_watering: { ts: string; amount_ml: number } | null;
+  last_watering: { ts: string; amount_ml: number | null } | null;
   learning: { ml_per_point: number | null; dry_rate_per_day: number | null; samples: number };
   hints: { severity: string; message: string }[];
 }

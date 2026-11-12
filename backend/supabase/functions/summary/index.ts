@@ -101,7 +101,7 @@ async function buildSummary(now: number, history: History = new Map()) {
     const [hourly, waterings] = await Promise.all([
       query(supabase.rpc("plant_hourly", { p_plant_id: plant.id, p_since: new Date(from).toISOString() })),
       query(supabase.from("waterings").select("ts, amount_ml, during_vacation").eq("plant_id", plant.id).gte("ts", new Date(from).toISOString())),
-    ]) as [{ hour: string; moisture: number | null; light: number | null }[], { ts: string; amount_ml: number; during_vacation: boolean }[]];
+    ]) as [{ hour: string; moisture: number | null; light: number | null }[], { ts: string; amount_ml: number | null; during_vacation: boolean }[]];
 
     const series: HourPoint[] = hourly.map((h) => ({ hour: ms(h.hour), moisture: num(h.moisture) }));
     const ws = waterings.map((w) => ({ ts: ms(w.ts), amount_ml: w.amount_ml, during_vacation: w.during_vacation }));

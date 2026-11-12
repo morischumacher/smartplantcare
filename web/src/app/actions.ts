@@ -58,11 +58,12 @@ async function duringVacation(ts: Date): Promise<boolean> {
 
 export async function logWatering(input: {
   plantId: string;
-  amountMl: number;
+  /** null: a detected watering confirmed without knowing the amount */
+  amountMl: number | null;
   ts?: string;
   source?: "manual" | "detected";
 }): Promise<ActionResult> {
-  if (!Number.isFinite(input.amountMl) || input.amountMl <= 0 || input.amountMl > 20000) {
+  if (input.amountMl === null ? input.source !== "detected" : !Number.isFinite(input.amountMl) || input.amountMl <= 0 || input.amountMl > 20000) {
     return { ok: false, error: "Bitte eine Menge zwischen 1 und 20000 ml eingeben." };
   }
   const ts = input.ts ? new Date(input.ts) : new Date();
@@ -71,7 +72,7 @@ export async function logWatering(input: {
     const { error } = await supabase.from("waterings").insert({
       plant_id: input.plantId,
       ts: ts.toISOString(),
-      amount_ml: Math.round(input.amountMl),
+      amount_ml: input.amountMl === null ? null : Math.round(input.amountMl),
       source: input.source ?? "manual",
       during_vacation: await duringVacation(ts),
     });
@@ -80,7 +81,7 @@ export async function logWatering(input: {
     return fail(e);
   }
   refresh();
-  return { ok: true, message: `${Math.round(input.amountMl)} ml eingetragen` };
+  return { ok: true, message: input.amountMl === null ? "Als gegossen eingetragen" : `${Math.round(input.amountMl)} ml eingetragen` };
 }
 
 export async function deleteWatering(id: string): Promise<ActionResult> {

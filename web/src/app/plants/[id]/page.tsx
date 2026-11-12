@@ -188,7 +188,7 @@ async function Plant({ params, searchParams }: Pick<PageProps<"/plants/[id]">, "
                     ? "Ohne Messwerte gibt es keine Empfehlung – trag Gießen trotzdem ein, dann lernt die App mit."
                     : "Feuchte im grünen Bereich. Wann wieder gegossen werden muss, sagt die App, sobald sie ein paar Tage Austrocknen gemessen hat."}
               {waterings[0] && (
-                <span className="block text-xs">Zuletzt {relTime(waterings[0].ts)} · {num(waterings[0].amount_ml)} ml</span>
+                <span className="block text-xs">Zuletzt {relTime(waterings[0].ts)}{waterings[0].amount_ml !== null && ` · ${num(waterings[0].amount_ml)} ml`}</span>
               )}
             </p>
             <WateringForm plantId={id} recommended={s.recommended_ml} />

@@ -63,7 +63,7 @@ const TWO_WATERINGS = simulate({
   rate: 4,
   waterings: [{ hoursAgo: 10 * 24, to: 45 }, { hoursAgo: 4 * 24, to: 45 }],
 });
-const watering = (hoursAgo: number, amount_ml: number, during_vacation = false): Watering => ({
+const watering = (hoursAgo: number, amount_ml: number | null, during_vacation = false): Watering => ({
   ts: NOW - hoursAgo * HOUR,
   amount_ml,
   during_vacation,
@@ -101,6 +101,13 @@ test("learnMlPerPoint: amount / rise, vacation waterings excluded", () => {
 
   const vacation = period(TWO_WATERINGS, [watering(240, 250, true), watering(96, 250, true)]);
   assert.deepEqual(learnMlPerPoint(vacation, NOW), { value: null, samples: 0 });
+});
+
+test("a watering with unknown amount: not learned from, but no longer asked about", () => {
+  const p = period(TWO_WATERINGS, [watering(240, null), watering(96, 240)]);
+  const l = learnMlPerPoint(p, NOW);
+  assert.equal(l.samples, 1);
+  assert.equal(summarize(plant(p)).pending_waterings.length, 0);
 });
 
 test("learnDryRate recovers the simulated rate", () => {

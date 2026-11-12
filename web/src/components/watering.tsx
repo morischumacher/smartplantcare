@@ -96,13 +96,21 @@ function PendingItem({ plantId, item, estimate }: { plantId: string; item: { ts:
         >
           Bestätigen
         </button>
+        <button
+          className="btn-ghost shrink-0 px-3"
+          disabled={pending}
+          title="Zählt als Gießen, fließt aber nicht ins Lernen der Menge ein"
+          onClick={() => start(async () => setState(await logWatering({ plantId, amountMl: null, ts: item.ts, source: "detected" })))}
+        >
+          Weiß nicht
+        </button>
       </div>
       <FormStatus state={state} />
     </li>
   );
 }
 
-export function WateringHistory({ items }: { items: { id: string; ts: string; amount_ml: number; source: string; during_vacation: boolean }[] }) {
+export function WateringHistory({ items }: { items: { id: string; ts: string; amount_ml: number | null; source: string; during_vacation: boolean }[] }) {
   const [pending, start] = useTransition();
   if (items.length === 0) return <p className="text-sm text-stone-500">Noch nichts eingetragen.</p>;
   return (
@@ -110,7 +118,7 @@ export function WateringHistory({ items }: { items: { id: string; ts: string; am
       {items.map((w) => (
         <li key={w.id} className="flex items-center gap-3 py-2">
           <span className="w-28 text-stone-500 tabular-nums">{dateTime(w.ts)}</span>
-          <span className="font-medium tabular-nums">{num(w.amount_ml)} ml</span>
+          <span className="font-medium tabular-nums">{w.amount_ml === null ? "Menge ?" : `${num(w.amount_ml)} ml`}</span>
           {w.source === "detected" && <span className="rounded-full bg-sky-100 px-2 text-xs text-sky-800 dark:bg-sky-500/20 dark:text-sky-200">erkannt</span>}
           {w.during_vacation && <span className="rounded-full bg-stone-100 px-2 text-xs dark:bg-stone-800">Urlaub</span>}
           <span className="ml-auto">

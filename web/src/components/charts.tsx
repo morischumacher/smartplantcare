@@ -19,7 +19,7 @@ import type { HourPoint } from "@/lib/types";
 type Props = {
   data: HourPoint[];
   target: { min: number; max: number };
-  waterings: { ts: string; amount_ml: number }[];
+  waterings: { ts: string; amount_ml: number | null }[];
   days: number;
   /** Server time of the data, used as the chart's right edge. */
   now: number;
@@ -66,7 +66,7 @@ export function SensorCharts({ data, target, waterings, days, now }: Props) {
               x={new Date(w.ts).getTime()}
               stroke="#345e6e"
               strokeDasharray="2 3"
-              label={{ value: `${w.amount_ml} ml`, position: "insideTopLeft", fontSize: 10, fill: "#345e6e" }}
+              label={{ value: w.amount_ml === null ? "gegossen" : `${w.amount_ml} ml`, position: "insideTopLeft", fontSize: 10, fill: "#345e6e" }}
             />
           ))}
           <Tooltip {...tooltipStyle} formatter={(v) => [`${v} %`, "Feuchte"]} />
