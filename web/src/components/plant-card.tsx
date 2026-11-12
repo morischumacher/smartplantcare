@@ -18,11 +18,17 @@ export function PlantRow({ plant }: { plant: PlantSummary }) {
   const todo = plantTodos(plant).find((t) => t.level !== "info");
   const light = lightCategory(plant.light_peak_7d);
   const s = STATUS[plant.status];
-  const detail =
-    todo?.text ??
-    [plant.moisture != null && "Feuchte ok", light?.label, plant.temperature != null && `${num(plant.temperature, 1)} °C`]
-      .filter(Boolean)
-      .join(" · ");
+  const values = [light?.label, plant.temperature != null && `${num(plant.temperature, 1)} °C`];
+  // "✓ Gerade gegossen" is good news, not a task: keep the values after it
+  const detail = (
+    todo?.level === "done"
+      ? [todo.text, ...values]
+      : todo
+        ? [todo.text]
+        : [plant.moisture != null && "Feuchte ok", ...values]
+  )
+    .filter(Boolean)
+    .join(" · ");
   const species = plant.species && plant.species !== plant.name ? plant.species : null;
 
   return (
