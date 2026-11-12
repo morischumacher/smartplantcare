@@ -179,6 +179,13 @@ async function buildSummary(now: number, history: History = new Map()) {
       light_season: season.light_season,
       ec_target: season.ec,
       winter: season.winter,
+      winter_temp_min: season.winter_temp_min,
+      // the plant's own year-round targets; target / temp_target / ec_target above are the ones for now
+      year_target: {
+        moisture: { min: Number(plant.moisture_min), max: Number(plant.moisture_max) },
+        temp: { min: num(plant.temp_min_c), max: num(plant.temp_max_c) },
+        ec: { min: num(plant.conductivity_min), max: num(plant.conductivity_max) },
+      },
       winter_note: winterNote(season.winter),
       status: s.status,
       recommended_ml: s.recommended_ml,

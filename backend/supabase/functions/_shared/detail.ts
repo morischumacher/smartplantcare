@@ -36,6 +36,8 @@ export function buckets(points: { ts: number; value: number | null }[], from: nu
   return sum.map((s, i) => (count[i] ? round1(s / count[i]) : null));
 }
 
+type Range = { min: number | null; max: number | null };
+
 export interface DetailPlant {
   id: string;
   name: string;
@@ -51,6 +53,8 @@ export interface DetailPlant {
   ec_target?: { min: number | null; max: number | null };
   light_season?: { min: number | null; max: number | null } | null;
   winter?: "pause" | "rest" | null;
+  winter_temp_min?: number | null;
+  year_target?: { moisture: { min: number; max: number }; temp: Range; ec: Range };
   recommended_ml: number | null;
   next_watering_at: string | null;
   last_watering: { ts: string; amount_ml: number } | null;
@@ -78,11 +82,18 @@ export function plantDetail(
     name: p.name,
     status: p.status,
     moisture: p.moisture === null ? null : Math.round(p.moisture),
+    // targets: min/max, temp_min/temp_max are the ones that apply now (winter, night); year_* the
+    // plant's year-round targets (green band); winter_* the winter range drawn as a blue line
     min,
     max,
+    year_min: p.year_target?.moisture.min ?? min,
+    year_max: p.year_target?.moisture.max ?? max,
     temp: p.temperature,
     temp_min: p.temp_target.min,
     temp_max: p.temp_target.max,
+    temp_year_min: p.year_target ? p.year_target.temp.min : p.temp_target.min,
+    temp_year_max: p.year_target ? p.year_target.temp.max : p.temp_target.max,
+    winter_temp_min: p.winter_temp_min ?? null,
     light: p.light_peak_7d ?? p.light,
     light_min: p.light_target?.min ?? null,
     light_max: p.light_target?.max ?? null,
@@ -90,9 +101,10 @@ export function plantDetail(
     light_season_min: p.light_season?.min ?? null,
     light_season_max: p.light_season?.max ?? null,
     ec: p.conductivity,
+    ec_min: p.year_target ? p.year_target.ec.min : p.ec_target?.min ?? null,
+    ec_max: p.year_target ? p.year_target.ec.max : p.ec_target?.max ?? null,
     // in the winter pause no fertiliser is needed: no lower limit (0)
-    ec_min: p.winter ? 0 : p.ec_target?.min ?? null,
-    ec_max: p.ec_target?.max ?? null,
+    ec_winter_min: p.winter ? 0 : null,
     ml: p.recommended_ml,
     next_h: hoursFrom(p.next_watering_at, now),
     last_h: p.last_watering ? -hoursFrom(p.last_watering.ts, now)! : null,

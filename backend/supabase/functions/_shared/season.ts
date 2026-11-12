@@ -55,6 +55,8 @@ export interface SeasonTargets {
   light_season: Range | null;
   /** fertiliser: no lower limit during the pause (no fertiliser needed) */
   ec: Range;
+  /** temperature minimum of the winter rest alone (without the night), null otherwise */
+  winter_temp_min: number | null;
 }
 
 export function seasonTargets(p: SeasonInput): SeasonTargets {
@@ -80,6 +82,7 @@ export function seasonTargets(p: SeasonInput): SeasonTargets {
     light: p.light,
     light_season: lightSeason,
     ec: pause ? { min: null, max: p.ec.max } : p.ec,
+    winter_temp_min: rest && p.temp.min !== null ? p.temp.min - REST_TEMP_DROP_C : null,
   };
 }
 

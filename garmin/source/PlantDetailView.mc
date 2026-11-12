@@ -108,8 +108,10 @@ class PlantDetailView extends WatchUi.View {
         }
     }
 
-    // a value with a bar: target range as a band, the value as a dot
-    function bar(dc as Graphics.Dc, y as Numeric, label as String, value as String, pos as Float?, lo as Float?, hi as Float?, color as Number) as Void {
+    // a value with a bar: the plant's year-round target as a green band, the value as a dot, and in
+    // winter the range that applies now as a thin blue line below (wlo/whi, null when the same)
+    function bar(dc as Graphics.Dc, y as Numeric, label as String, value as String, pos as Float?, lo as Float?, hi as Float?,
+            wlo as Float?, whi as Float?, color as Number) as Void {
         var w = dc.getWidth();
         var x0 = w * 0.18;
         var x1 = w * 0.82;
@@ -120,7 +122,13 @@ class PlantDetailView extends WatchUi.View {
         dc.fillRoundedRectangle(x0, by - 3, x1 - x0, 6, 3);
         if (lo != null && hi != null) {
             dc.setColor(PlantsData.BAND, Graphics.COLOR_TRANSPARENT);
-            dc.fillRectangle(x0 + (x1 - x0) * lo, by - 3, (x1 - x0) * (hi - lo), 6);
+            dc.fillRectangle(x0 + (x1 - x0) * PlantsDraw.clamp(lo), by - 3, (x1 - x0) * (PlantsDraw.clamp(hi) - PlantsDraw.clamp(lo)), 6);
+        }
+        if (wlo != null && whi != null) {
+            var a = x0 + (x1 - x0) * PlantsDraw.clamp(wlo);
+            var b = x0 + (x1 - x0) * PlantsDraw.clamp(whi);
+            dc.setColor(PlantsData.BLUE, Graphics.COLOR_TRANSPARENT);
+            dc.fillRoundedRectangle(a, by + 10, b - a, 3, 1);
         }
         if (pos != null) {
             dc.setColor(color, Graphics.COLOR_TRANSPARENT);
@@ -131,24 +139,34 @@ class PlantDetailView extends WatchUi.View {
     function drawValues(dc as Graphics.Dc, d as Dictionary) as Void {
         var w = dc.getWidth();
         var h = dc.getHeight();
-        // in winter the title says so: the targets below are the winter ones
+        // in winter the title says so; the blue lines are the winter ranges
         var winter = d["winter"];
         var title = winter == null ? "Messwerte" : (winter as String).equals("rest") ? "Winterruhe" : "Winterpause";
         PlantsDraw.text(dc, w / 2, h * 0.13, Graphics.FONT_XTINY, title, winter == null ? PlantsData.GREY : PlantsData.BLUE, PlantsDraw.CENTER);
 
+        // moisture: the current threshold (min) is lower than the year-round one during the winter rest
         var m = d["moisture"];
+        var yMin = (d["year_min"] != null ? d["year_min"] : d["min"]) as Numeric;
+        var yMax = (d["year_max"] != null ? d["year_max"] : d["max"]) as Numeric;
+        var cMin = d["min"] as Numeric;
+        var cMax = d["max"] as Numeric;
+        var mWinter = cMin != yMin || cMax != yMax;
         bar(dc, h * 0.24, "Feuchte", m == null ? "–" : (m as Numeric).format("%d") + " %", m == null ? null : (m as Numeric).toFloat() / 100,
-            (d["min"] as Numeric).toFloat() / 100, (d["max"] as Numeric).toFloat() / 100, PlantsData.color(d["status"] as String));
+            yMin.toFloat() / 100, yMax.toFloat() / 100, mWinter ? cMin.toFloat() / 100 : null, mWinter ? cMax.toFloat() / 100 : null,
+            PlantsData.color(d["status"] as String));
 
-        // temperature on a 5–35 °C scale
+        // temperature on a 5–35 °C scale; judged against what applies now (cooler is fine at night / in the rest)
         var t = d["temp"];
+        var tyMin = d["temp_year_min"] != null ? d["temp_year_min"] : d["temp_min"];
+        var tyMax = d["temp_year_max"] != null ? d["temp_year_max"] : d["temp_max"];
+        var twMin = d["winter_temp_min"];
         bar(dc, h * 0.4, "Temperatur", t == null ? "–" : PlantsData.dec(t as Numeric) + " °C",
-            t == null ? null : tempPos(t as Numeric), d["temp_min"] == null ? null : tempPos(d["temp_min"] as Numeric),
-            d["temp_max"] == null ? null : tempPos(d["temp_max"] as Numeric), rangeColor(t, d["temp_min"], d["temp_max"]));
+            t == null ? null : tempPos(t as Numeric), tyMin == null ? null : tempPos(tyMin as Numeric), tyMax == null ? null : tempPos(tyMax as Numeric),
+            twMin == null ? null : tempPos(twMin as Numeric), twMin == null || tyMax == null ? null : tempPos(tyMax as Numeric),
+            rangeColor(t, d["temp_min"], d["temp_max"]));
 
-        // light: daily peak on a log scale 100 – 50,000 lux, as the eye sees it. The green band is the
-        // plant's year-round target; in winter a thin line below shows what is normal this month, and
-        // the dot is only ochre when it is darker than that.
+        // light: daily peak on a log scale 100 – 50,000 lux, as the eye sees it; in winter the blue line
+        // is what is normal this month, and the dot is only ochre when it is darker than that
         var l = d["light"];
         var sMin = d["light_season_min"];
         var sMax = d["light_season_max"];
@@ -156,25 +174,20 @@ class PlantDetailView extends WatchUi.View {
         bar(dc, h * 0.56, "Licht", lightWord(l, d["light_min"], d["light_max"], sMin),
             l == null ? null : luxPos(l as Numeric), d["light_min"] == null ? null : luxPos(d["light_min"] as Numeric),
             d["light_max"] == null ? null : luxPos(d["light_max"] as Numeric),
+            season ? luxPos(sMin as Numeric) : null, season ? luxPos(sMax as Numeric) : null,
             season ? rangeColor(l, sMin, d["light_max"]) : rangeColor(l, d["light_min"], d["light_max"]));
-        if (season) {
-            var x0 = w * 0.18;
-            var x1 = w * 0.82;
-            var a = x0 + (x1 - x0) * PlantsDraw.clamp(luxPos(sMin as Numeric));
-            var b = x0 + (x1 - x0) * PlantsDraw.clamp(luxPos(sMax as Numeric));
-            var ly = h * 0.56 + w * 0.055 + 10;
-            dc.setColor(PlantsData.BLUE, Graphics.COLOR_TRANSPARENT);
-            dc.fillRoundedRectangle(a, ly, b - a, 3, 1);
-            PlantsDraw.text(dc, w / 2, h * 0.87, Graphics.FONT_XTINY, "blau = normal im Winter", PlantsData.BLUE, PlantsDraw.CENTER);
-        }
 
-        // fertiliser: conductivity 0 – 2,500 µS/cm; without plant targets the web app's 200 – 2000
+        // fertiliser: conductivity 0 – 2,500 µS/cm; without plant targets the web app's 200 – 2000.
+        // In winter no fertiliser is needed, so nothing counts as too little.
         var ec = d["ec"];
         var ecMin = d["ec_min"] != null ? d["ec_min"] : 200;
         var ecMax = d["ec_max"] != null ? d["ec_max"] : 2000;
-        bar(dc, h * 0.72, "Dünger", ec == null ? "–" : (ec as Numeric) < (ecMin as Numeric) ? "zu wenig" : (ec as Numeric) > (ecMax as Numeric) ? "zu viel" : "passt",
+        var ewMin = d["ec_winter_min"];
+        var judgeMin = ewMin != null ? ewMin : ecMin;
+        bar(dc, h * 0.72, "Dünger", ec == null ? "–" : (ec as Numeric) < (judgeMin as Numeric) ? "zu wenig" : (ec as Numeric) > (ecMax as Numeric) ? "zu viel" : "passt",
             ec == null ? null : (ec as Numeric).toFloat() / 2500, (ecMin as Numeric).toFloat() / 2500, (ecMax as Numeric).toFloat() / 2500,
-            rangeColor(ec, ecMin, ecMax));
+            ewMin == null ? null : (ewMin as Numeric).toFloat() / 2500, ewMin == null ? null : (ecMax as Numeric).toFloat() / 2500,
+            rangeColor(ec, judgeMin, ecMax));
     }
 
     // like the fertiliser: a word instead of lux; in winter "ok für Winter" when it is only dark

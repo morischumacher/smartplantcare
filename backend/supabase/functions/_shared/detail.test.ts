@@ -38,6 +38,8 @@ test("plant detail: values, rhythm and the most important hint", () => {
   assert.equal(d.light_min, 300);
   assert.equal(d.light_max, 15000);
   assert.equal(d.ec_min, null);
+  assert.equal(d.year_min, 35);
+  assert.equal(d.ec_winter_min, null);
   assert.equal(d.last_ml, 300);
   assert.equal(d.last_h, 146);
   assert.equal(d.next_h, 0);
@@ -70,4 +72,22 @@ test("room detail: climate and 24 hourly points", () => {
   assert.equal(d.humidity_series.length, 24);
   assert.equal(d.humidity_series[23], 51);
   assert.equal(roomDetail({ ...room, climate: null }, [], NOW).status, "no_data");
+});
+
+test("plant detail in winter rest: current targets, year-round targets and the winter range", () => {
+  const d = plantDetail(plant({
+    winter: "rest",
+    target: { min: 8, max: 40 },
+    temp_target: { min: 12, max: 30 },
+    winter_temp_min: 12,
+    ec_target: { min: null, max: 1500 },
+    year_target: { moisture: { min: 12, max: 40 }, temp: { min: 15, max: 30 }, ec: { min: 300, max: 1500 } },
+  }), [], [], NOW);
+  assert.equal(d.min, 8);
+  assert.equal(d.year_min, 12);
+  assert.equal(d.temp_min, 12);
+  assert.equal(d.temp_year_min, 15);
+  assert.equal(d.winter_temp_min, 12);
+  assert.equal(d.ec_min, 300);
+  assert.equal(d.ec_winter_min, 0);
 });
