@@ -28,6 +28,7 @@ cp secrets.yaml.example secrets.yaml
 
 In `secrets.yaml` eintragen:
 - `wifi_ssid` / `wifi_password`: dein WLAN (2,4 GHz – der ESP32 kann kein 5 GHz)
+- `wifi_ssid_next` / `wifi_password_next`: künftiger WLAN-Name und -Kennwort; ohne geplanten Wechsel dieselben Werte wie oben. Name oder Kennwort ändern: hier eintragen, per OTA flashen, erst dann am Router ändern – das Gateway wechselt von selbst.
 - `fallback_ap_password`: beliebig, mind. 8 Zeichen
 - `ota_password`: z. B. `openssl rand -hex 16`
 - `ingest_secret`: derselbe Wert wie `INGEST_SECRET` in Supabase

@@ -21,8 +21,13 @@ logger:
   level: INFO
 
 wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
+  # Current and upcoming Wi-Fi, so the router name/password can change without losing the gateway:
+  # put the new values in wifi_ssid_next / wifi_password_next, flash via OTA, then change the router.
+  networks:
+    - ssid: !secret wifi_ssid
+      password: !secret wifi_password
+    - ssid: !secret wifi_ssid_next
+      password: !secret wifi_password_next
   # If the Wi-Fi is unreachable, the gateway opens this access point for reconfiguration.
   ap:
     ssid: Plant-Gateway-Setup
