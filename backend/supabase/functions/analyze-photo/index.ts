@@ -9,7 +9,8 @@
 
 import Anthropic from "npm:@anthropic-ai/sdk@1";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { HttpError, isSignedIn, json, loadImage } from "../_shared/images.ts";
+import { logUsage } from "../_shared/ai-usage.ts";
+import { HttpError, isSignedIn, json, loadImageForAi } from "../_shared/images.ts";
 import { seasonOf } from "../_shared/watering.ts";
 
 const supabase = createClient(
@@ -111,18 +112,18 @@ async function analyze(photoId: string) {
     .maybeSingle();
 
   const [current, before, context] = await Promise.all([
-    loadImage(supabase, photo.storage_path),
-    previous ? loadImage(supabase, previous.storage_path) : Promise.resolve(null),
+    loadImageForAi(supabase, photo.storage_path),
+    previous ? loadImageForAi(supabase, previous.storage_path) : Promise.resolve(null),
     sensorContext(photo.plant_id),
   ]);
 
   const content: Anthropic.Beta.BetaContentBlockParam[] = [];
   if (before && previous) {
     content.push({ type: "text", text: `Früheres Foto vom ${previous.taken_at.slice(0, 10)}:` });
-    content.push({ type: "image", source: { type: "base64", ...before } });
+    content.push(before.block);
   }
   content.push({ type: "text", text: `Aktuelles Foto vom ${photo.taken_at.slice(0, 10)}:` });
-  content.push({ type: "image", source: { type: "base64", ...current } });
+  content.push(current.block);
   content.push({ type: "text", text: `Sensordaten:\n${context}\n\nBeurteile die Pflanze auf dem aktuellen Foto.` });
 
   const response = await anthropic.beta.messages.create({
@@ -136,6 +137,7 @@ async function analyze(photoId: string) {
     messages: [{ role: "user", content }],
   });
 
+  await logUsage(supabase, "analyze-photo", response, before ? [before, current] : [current]);
   if (response.stop_reason === "refusal") throw new HttpError(422, "analysis declined by the model");
   const text = response.content.find((b) => b.type === "text");
   if (!text || text.type !== "text") throw new Error(`no text in response (stop_reason ${response.stop_reason})`);

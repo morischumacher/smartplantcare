@@ -12,7 +12,8 @@
 
 import Anthropic from "npm:@anthropic-ai/sdk@1";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { HttpError, isSignedIn, json, loadImage } from "../_shared/images.ts";
+import { logUsage } from "../_shared/ai-usage.ts";
+import { HttpError, isSignedIn, json, loadImageForAi, type AiImage } from "../_shared/images.ts";
 import { matchSpecies, type SpeciesName } from "../_shared/species.ts";
 import { findSpeciesImage } from "../_shared/wikimedia.ts";
 
@@ -26,7 +27,13 @@ const MODEL = "claude-opus-5-5";
 
 const SOIL_TYPES = ["universal", "cactus", "orchid", "herb", "peat_free", "other"];
 
-async function ask<T>(system: string, content: Anthropic.Beta.BetaContentBlockParam[], schema: Record<string, unknown>, effort: "low" | "medium" | "high"): Promise<T> {
+async function ask<T>(
+  system: string,
+  content: Anthropic.Beta.BetaContentBlockParam[],
+  schema: Record<string, unknown>,
+  effort: "low" | "medium" | "high",
+  images: AiImage[] = [],
+): Promise<T> {
   const response = await anthropic.beta.messages.create({
     model: MODEL,
     max_tokens: 4000,
@@ -36,6 +43,7 @@ async function ask<T>(system: string, content: Anthropic.Beta.BetaContentBlockPa
     fallbacks: "default",
     messages: [{ role: "user", content }],
   });
+  await logUsage(supabase, images.length ? "plant-species:identify" : "plant-species:profile", response, images);
   if (response.stop_reason === "refusal") throw new HttpError(422, "declined by the model");
   const text = response.content.find((b) => b.type === "text");
   if (!text || text.type !== "text") throw new Error(`no text in response (stop_reason ${response.stop_reason})`);
@@ -165,15 +173,17 @@ const IDENTIFY_SCHEMA = {
 async function identify(photoPath: string) {
   const list = await allSpecies();
   const known = list.map((s) => `${s.scientific_name} (${s.common_name_de})`).join("; ");
+  const photo = await loadImageForAi(supabase, photoPath);
   const r = await ask<{ is_plant: boolean; scientific_name: string; common_name_de: string; confidence: "high" | "medium" | "low"; alternatives: string[]; reasoning: string }>(
     `Du bestimmst Zimmerpflanzen anhand von Fotos. Nenne die Art in aktueller wissenschaftlicher Nomenklatur.
 Sei ehrlich bei der Sicherheit: "high" nur bei eindeutigen Merkmalen. Bevorzuge, wenn passend, eine dieser bekannten Arten: ${known}`,
     [
-      { type: "image", source: { type: "base64", ...(await loadImage(supabase, photoPath)) } },
+      photo.block,
       { type: "text", text: "Welche Pflanze ist das?" },
     ],
     IDENTIFY_SCHEMA,
     "medium",
+    [photo],
   );
   if (!r.is_plant) return { guess: null, confidence: "low", alternatives: [], reasoning: r.reasoning, species: null };
   // Only create a new profile when reasonably sure; for a low-confidence guess just report it.
