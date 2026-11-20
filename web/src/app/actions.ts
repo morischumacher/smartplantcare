@@ -2,6 +2,7 @@
 
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
+import { withAiCopies } from "@/lib/ai-copy";
 import { callFunction, createClient } from "@/lib/supabase/server";
 import type { CandidateSuggestion, FloorPlan, Species } from "@/lib/types";
 
@@ -185,7 +186,7 @@ export async function deletePlant(id: string): Promise<ActionResult> {
     const supabase = await createClient();
     const { data: photos } = await supabase.from("plant_photos").select("storage_path").eq("plant_id", id);
     // closeups of accepted candidates are shared with the candidate row; removing the file is fine either way
-    if (photos?.length) await supabase.storage.from("plant-photos").remove(photos.map((p) => p.storage_path));
+    if (photos?.length) await supabase.storage.from("plant-photos").remove(withAiCopies(photos.map((p) => p.storage_path)));
     const { error } = await supabase.from("plants").delete().eq("id", id);
     if (error) throw error;
   } catch (e) {
@@ -294,7 +295,7 @@ export async function reanalyzePhoto(photoId: string): Promise<ActionResult> {
 export async function deletePhoto(photoId: string): Promise<ActionResult> {
   const supabase = await createClient();
   const { data } = await supabase.from("plant_photos").select("storage_path").eq("id", photoId).single();
-  if (data) await supabase.storage.from("plant-photos").remove([data.storage_path]);
+  if (data) await supabase.storage.from("plant-photos").remove(withAiCopies([data.storage_path]));
   const { error } = await supabase.from("plant_photos").delete().eq("id", photoId);
   if (error) return fail(error);
   refresh();
@@ -345,7 +346,7 @@ export async function setRoomPhotos(roomId: string, paths: string[]): Promise<Ac
   const supabase = await createClient();
   const { data: room } = await supabase.from("rooms").select("photo_paths").eq("id", roomId).single();
   const removed = ((room?.photo_paths as string[]) ?? []).filter((p) => !paths.includes(p));
-  if (removed.length > 0) await supabase.storage.from("plant-photos").remove(removed);
+  if (removed.length > 0) await supabase.storage.from("plant-photos").remove(withAiCopies(removed));
   const { error } = await supabase.from("rooms").update({ photo_paths: paths.slice(0, 4) }).eq("id", roomId);
   if (error) return fail(error);
   refresh();

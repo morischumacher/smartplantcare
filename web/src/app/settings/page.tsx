@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { signOut } from "@/app/actions";
-import { ArchiveIcon, BellIcon, DoorIcon, SensorIcon, SuitcaseIcon } from "@/components/icons";
+import { ArchiveIcon, BellIcon, DoorIcon, SensorIcon, SparkIcon, SuitcaseIcon } from "@/components/icons";
 import { SettingsRow } from "@/components/settings-ui";
 import { Skeleton } from "@/components/ui";
-import { getArchivedPlants, getNotifySettings, getRooms, getSensors, getVacations } from "@/lib/data";
+import { summarize, usd } from "@/lib/ai-cost";
+import { getAiUsage, getArchivedPlants, getNotifySettings, getRooms, getSensors, getVacations } from "@/lib/data";
 import { date } from "@/lib/format";
 import { silentSensors } from "@/lib/sensors";
 
@@ -26,7 +27,15 @@ export default function SettingsPage() {
 
 // One row per area with its current state, so you see at a glance what is set up and what needs attention.
 async function Menu() {
-  const [rooms, sensors, vacations, notify, archived] = await Promise.all([getRooms(), getSensors(), getVacations(), getNotifySettings(), getArchivedPlants()]);
+  const [rooms, sensors, vacations, notify, archived, usage] = await Promise.all([
+    getRooms(),
+    getSensors(),
+    getVacations(),
+    getNotifySettings(),
+    getArchivedPlants(),
+    getAiUsage().catch(() => []),
+  ]);
+  const ai = summarize(usage);
   const soil = sensors.filter((s) => s.type !== "hygrometer");
   const hygro = sensors.length - soil.length;
   const unassigned = soil.filter((s) => s.plant_sensors.length === 0).length;
@@ -71,6 +80,12 @@ async function Menu() {
           icon={<SuitcaseIcon className="size-5" />}
           title="Urlaub"
           detail={v ? `${v.starts_on <= today ? "Läuft gerade" : "Geplant"}: ${date(v.starts_on)} – ${date(v.ends_on)}` : "Nichts geplant"}
+        />
+        <SettingsRow
+          href="/settings/ai"
+          icon={<SparkIcon className="size-5" />}
+          title="KI-Kosten"
+          detail={ai.calls ? `${ai.calls} Aufrufe · ${usd(ai.costUsd)} in 30 Tagen` : "Noch keine Aufrufe protokolliert"}
         />
         {archived.length > 0 && (
           <SettingsRow

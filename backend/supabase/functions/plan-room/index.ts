@@ -17,7 +17,8 @@
 
 import Anthropic from "npm:@anthropic-ai/sdk@1";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { HttpError, isSignedIn, json, loadImage, loadScan } from "../_shared/images.ts";
+import { logUsage } from "../_shared/ai-usage.ts";
+import { HttpError, isSignedIn, json, loadImageForAi, type AiImage, loadScan } from "../_shared/images.ts";
 import { dedupeDetections } from "../_shared/candidates.ts";
 import { matchSpecies } from "../_shared/species.ts";
 
@@ -287,6 +288,7 @@ async function planRoom(roomId: string, mode: "plan" | "plants") {
   if (dismissedError) throw dismissedError;
 
   const content: Anthropic.Beta.BetaContentBlockParam[] = [];
+  const images: AiImage[] = [];
   // In plants mode the saved plan is binding, just like an IFC scan.
   const savedPlan = mode === "plants" ? (room.floor_plan as ScanPlan) : null;
   const scanPlan = savedPlan ?? (room.scan_plan as ScanPlan | null);
@@ -303,7 +305,10 @@ async function planRoom(roomId: string, mode: "plan" | "plants") {
   }
   for (const [i, path] of roomPhotos.entries()) {
     content.push({ type: "text", text: `Raum „${room.name}“, Foto ${i + 1} von ${roomPhotos.length}:` });
-    content.push({ type: "image", source: { type: "base64", ...(await loadImage(supabase, path)) } });
+    // Room photos keep full resolution: the floor plan needs the detail.
+    const image = await loadImageForAi(supabase, path, { preferAiCopy: false });
+    images.push(image);
+    content.push(image.block);
   }
   content.push({ type: "text", text: plants.length > 0 ? "Bereits angelegte Pflanzen in diesem Raum:" : "In diesem Raum sind noch keine Pflanzen angelegt." });
   let references = 0;
@@ -312,7 +317,9 @@ async function planRoom(roomId: string, mode: "plan" | "plants") {
     const ref = (p.plant_photos as { storage_path: string }[])[0];
     if (ref && references < MAX_REFERENCE_PHOTOS) {
       content.push({ type: "text", text: `${label}, Referenzfoto:` });
-      content.push({ type: "image", source: { type: "base64", ...(await loadImage(supabase, ref.storage_path)) } });
+      const image = await loadImageForAi(supabase, ref.storage_path);
+      images.push(image);
+      content.push(image.block);
       references++;
     } else {
       content.push({ type: "text", text: `${label} (kein Referenzfoto, anhand der Art erkennen)` });
@@ -330,6 +337,7 @@ async function planRoom(roomId: string, mode: "plan" | "plants") {
     messages: [{ role: "user", content }],
   });
 
+  await logUsage(supabase, "plan-room", response, images);
   if (response.stop_reason === "refusal") throw new HttpError(422, "declined by the model");
   const text = response.content.find((b) => b.type === "text");
   if (!text || text.type !== "text") throw new Error(`no text in response (stop_reason ${response.stop_reason})`);

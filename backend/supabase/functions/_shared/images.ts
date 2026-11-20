@@ -1,6 +1,7 @@
 // Shared helpers for Edge Functions that send photos from the plant-photos bucket to Claude.
 
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { aiCopyPath, displayTokensFromCopy, imageSize, visualTokens } from "./tokens.ts";
 
 export const BUCKET = "plant-photos";
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // API limit per image
@@ -26,6 +27,45 @@ export async function loadImage(supabase: SupabaseClient, path: string): Promise
   }
   if (blob.size > MAX_IMAGE_BYTES) throw new HttpError(413, "image larger than 5 MB; resize before upload");
   return { media_type: blob.type as MediaType, data: toBase64(new Uint8Array(await blob.arrayBuffer())) };
+}
+
+/** An image block for Claude plus the visual tokens it costs (for the usage log). */
+export type AiImage = {
+  block: { type: "image"; source: { type: "base64"; media_type: MediaType; data: string } };
+  /** Visual tokens of what is sent. */
+  tokens: number;
+  /** Visual tokens the full display photo would have cost (equal to `tokens` without an AI copy). */
+  fullTokens: number;
+};
+
+/**
+ * Loads a photo for a Claude call. With `preferAiCopy`, the smaller AI copy written at upload
+ * (`<name>.ai.jpg`, ≤ 1,200 visual tokens) is used when it exists; older photos fall back to the original.
+ */
+export async function loadImageForAi(supabase: SupabaseClient, path: string, { preferAiCopy = true } = {}): Promise<AiImage> {
+  if (preferAiCopy) {
+    const { data: copy } = await supabase.storage.from(BUCKET).download(aiCopyPath(path));
+    if (copy && copy.type === "image/jpeg" && copy.size <= MAX_IMAGE_BYTES) {
+      const bytes = new Uint8Array(await copy.arrayBuffer());
+      const size = imageSize(bytes);
+      const tokens = size ? visualTokens(size.width, size.height) : 0;
+      return {
+        block: { type: "image", source: { type: "base64", media_type: "image/jpeg", data: toBase64(bytes) } },
+        tokens,
+        fullTokens: size ? displayTokensFromCopy(size.width, size.height) : tokens,
+      };
+    }
+  }
+  const image = await loadImage(supabase, path);
+  const size = imageSize(fromBase64(image.data));
+  const tokens = size ? visualTokens(size.width, size.height) : 0;
+  return { block: { type: "image", source: { type: "base64", ...image } }, tokens, fullTokens: tokens };
+}
+
+function fromBase64(data: string): Uint8Array {
+  // Only the header is needed to read the size.
+  const head = atob(data.slice(0, 87_384)); // 64 KiB of image data
+  return Uint8Array.from(head, (c) => c.charCodeAt(0));
 }
 
 const MAX_PDF_BYTES = 20 * 1024 * 1024;

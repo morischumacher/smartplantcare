@@ -1,6 +1,7 @@
 import "server-only";
 import { callFunction, createClient } from "@/lib/supabase/server";
 import type { Candidate, HourPoint, Species, Summary } from "@/lib/types";
+import type { UsageRow } from "@/lib/ai-cost";
 
 // Server-side reads. All run as the signed-in user, so they belong inside <Suspense> boundaries.
 
@@ -199,4 +200,17 @@ export async function getCandidates(roomId: string): Promise<Candidate[]> {
     photo_url: c.photo_path ? (urls.get(c.photo_path) ?? null) : null,
     closeup_url: c.closeup_path ? (urls.get(c.closeup_path) ?? null) : null,
   }));
+}
+
+/** Claude calls of the last `days` days, newest first (written by the Edge Functions). */
+export async function getAiUsage(days = 30): Promise<UsageRow[]> {
+  const supabase = await createClient();
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const { data, error } = await supabase
+    .from("ai_usage")
+    .select("created_at, function, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, image_count, image_tokens, image_tokens_full")
+    .gte("created_at", since)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data as UsageRow[];
 }

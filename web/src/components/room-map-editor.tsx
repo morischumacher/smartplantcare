@@ -676,7 +676,7 @@ function RoomPhotos({ roomId, photos }: { roomId: string; photos: { path: string
     start(async () => {
       try {
         const room = photos.map((p) => p.path);
-        for (const f of Array.from(files).slice(0, 4 - room.length)) room.push(await uploadPhoto(f, `rooms/${roomId}`));
+        for (const f of Array.from(files).slice(0, 4 - room.length)) room.push(await uploadPhoto(f, `rooms/${roomId}`, { aiCopy: false }));
         const res = await setRoomPhotos(roomId, room);
         if (!res.ok) setError(res.error);
       } catch (e) {
