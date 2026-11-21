@@ -1,39 +1,48 @@
 # Smart Plant Care
 
-**Demo (2 Min., Englisch):** Sensoren, Dashboard, Raumplan, Gieß-Lernen und Kosten.
+My own IoT system for looking after my houseplants, in daily use. Sensors in each pot measure soil moisture, light, temperature and humidity; the system learns how each plant reacts to watering and forecasts when it needs water next.
 
-[![Smart Plant Care Demo-Video](docs/demo/smartplantcare-demo.jpg)](docs/demo/smartplantcare-demo.mp4)
+**Demo (2 min):** sensors, dashboard, room plan, how it learns from watering, and what it costs.
 
-## Auf einen Blick
+[![Smart Plant Care demo video](docs/demo/smartplantcare-demo.jpg)](docs/demo/smartplantcare-demo.mp4)
 
-| | |
-|---|---|
-| **Was** | Ein eigenes IoT-System zur Pflanzenüberwachung, im Alltag in Benutzung. Sensoren messen Bodenfeuchte, Licht, Temperatur und Luftfeuchte; das System lernt, wie jede Pflanze auf Gießen reagiert, und sagt den nächsten Gießzeitpunkt voraus. |
-| **Rolle** | Einzelprojekt: Idee, Hardware, Firmware, Backend, Web-App, iPhone-Widget und Garmin-App. |
-| **Highlights** | Ende zu Ende: BLE-Sensoren → ESP32-Gateway (M5Stack Atom Lite, ESPHome) → Supabase (EU) → Web-App, iPhone-Widget und Garmin-Uhr.<br>Lernt pro Pflanze, wie viel Wasser einen Prozentpunkt Feuchte bringt und wie schnell der Topf austrocknet, getrennt nach Jahreszeit.<br>Foto-Tagebuch mit KI-Check über die Claude API.<br>Push-Hinweise zu Gießen, Luftfeuchte und Sensor-Ausfall; automatische Winterruhe; Urlaubsmodus.<br>Läuft komplett im Supabase Free Tier, ohne eigenen Server. |
-| **Stack** | ESPHome / C++, Supabase (PostgreSQL, Edge Functions in TypeScript, pg_cron, Row Level Security), Next.js als PWA auf Vercel, Scriptable (JavaScript), Garmin Connect IQ (Monkey C), ntfy |
+## What it does
 
-## Architektur
+- End to end: BLE sensors → ESP32 gateway (M5Stack Atom Lite, ESPHome) → Supabase (EU) → web app, iPhone widget and Garmin watch.
+- Learns per plant how much water raises the moisture by one percentage point and how fast the pot dries out, separately for each season.
+- Photo diary with a health check through the Claude API.
+- Push notifications for watering, humidity and sensor failures; automatic winter dormancy; holiday mode.
+- Runs entirely on the Supabase free tier, without a server of my own.
+
+## My role
+
+Solo project: idea, hardware, firmware, backend, web app, iPhone widget and Garmin app.
+
+## Tech stack
+
+ESPHome / C++, Supabase (PostgreSQL, Edge Functions in TypeScript, pg_cron, Row Level Security), Next.js as a PWA on Vercel, Scriptable (JavaScript), Garmin Connect IQ (Monkey C), ntfy
+
+## Architecture
 
 ```
 Flower Care (HHCCJCY01) ─┐
 Govee H5075 ─────────────┼─ BLE ─▶ Atom Lite / ESPHome ─ HTTPS ─▶ Supabase Edge Function `ingest`
                          ┘                                              │
-                                                              Postgres (Messwerte, Pflanzen, …)
+                                                              Postgres (readings, plants, …)
                                                                         │
-                       Edge Function `summary` (nur lesend) ◀───────────┤
+                       Edge Function `summary` (read-only) ◀────────────┤
                           │                                             │
-            iPhone-Widget, Garmin-Glance                 Web-App (PWA) · Push über ntfy
+            iPhone widget, Garmin glance                  Web app (PWA) · push via ntfy
 ```
 
-## Ordner
+## Folders
 
-| Ordner | Inhalt |
+| Folder | Contents |
 | --- | --- |
-| `firmware/` | ESPHome-Konfiguration für das Gateway |
-| `backend/` | Supabase: Migrationen und Edge Functions |
-| `web/` | Web-App (Next.js) |
-| `scriptable/` | iPhone-Widget |
-| `garmin/` | Connect-IQ-App für die Forerunner 165 |
+| `firmware/` | ESPHome configuration for the gateway |
+| `backend/` | Supabase: migrations and Edge Functions |
+| `web/` | Web app (Next.js) |
+| `scriptable/` | iPhone widget |
+| `garmin/` | Connect IQ app for the Forerunner 165 |
 
-Der vollständige Projektplan steht in [PLAN.md](PLAN.md).
+The full project plan (in German) is in [PLAN.md](PLAN.md).
