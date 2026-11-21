@@ -1,5 +1,9 @@
 # Smart Plant Care
 
+**Demo (2 Min., Englisch):** Sensoren, Dashboard, Raumplan, Gieß-Lernen und Kosten.
+
+[![Smart Plant Care Demo-Video](docs/demo/smartplantcare-demo.jpg)](docs/demo/smartplantcare-demo.mp4)
+
 ## Auf einen Blick
 
 | | |
