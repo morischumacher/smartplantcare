@@ -244,6 +244,11 @@ h1,
 ::view-transition {
   pointer-events: none; /* taps during a transition reach the live page */
 }
+/* No page-wide cross-fade: untyped navigations (tabs, browser back) swap instantly. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
 ::view-transition-group(site-header),
 ::view-transition-group(tab-bar) {
   animation: none;
