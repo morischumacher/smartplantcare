@@ -9,12 +9,15 @@ import { getSensors, getSummary, getVacations } from "@/lib/data";
 import { silentSensors } from "@/lib/sensors";
 import { date, num, relTime } from "@/lib/format";
 import type { RoomSummary } from "@/lib/types";
+import { NAV_FORWARD, PageTransition } from "@/components/page-transition";
 
 export default function OverviewPage() {
   return (
-    <Suspense fallback={<OverviewSkeleton />}>
-      <Overview />
-    </Suspense>
+    <PageTransition>
+      <Suspense fallback={<OverviewSkeleton />}>
+        <Overview />
+      </Suspense>
+    </PageTransition>
   );
 }
 
@@ -38,7 +41,7 @@ async function Overview() {
             {lastSeen && ` · Messwerte ${relTime(lastSeen)}`}
           </p>
         </div>
-        <Link href="/plants/new" className="btn shrink-0" aria-label="Pflanze hinzufügen">
+        <Link href="/plants/new" transitionTypes={NAV_FORWARD} className="btn shrink-0" aria-label="Pflanze hinzufügen">
           <PlusIcon className="size-4" /> <span className="hidden sm:inline">Pflanze</span>
         </Link>
       </div>
@@ -46,7 +49,7 @@ async function Overview() {
       <InstallHint />
 
       {silent.length > 0 && (
-        <Link href="/settings/sensors" className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-400/10 dark:text-amber-100">
+        <Link href="/settings/sensors" transitionTypes={NAV_FORWARD} className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-400/10 dark:text-amber-100">
           <AlertIcon className="size-5 shrink-0" />
           <span className="flex-1">
             {silent.length === 1 ? "Ein Sensor sendet" : `${silent.length} Sensoren senden`} seit {relTime(silent.map((x) => x.last_seen_at!).sort()[0]).replace(/^vor /, "")} nichts.
@@ -70,7 +73,7 @@ async function Overview() {
           <ul className="divide-y divide-rose-200/60 dark:divide-rose-900/50">
             {thirsty.map((p) => (
               <li key={p.id} className="flex items-center gap-2 pr-4">
-                <Link href={`/plants/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 transition hover:opacity-80">
+                <Link href={`/plants/${p.id}`} transitionTypes={NAV_FORWARD} className="row flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 hover:opacity-80 active:opacity-60">
                   <span className={`size-2 shrink-0 rounded-full ${p.status === "water_now" ? "bg-rose-500" : "bg-amber-400"}`} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{p.name}</span>
@@ -114,7 +117,7 @@ function RoomSection({ room }: { room: RoomSummary }) {
     <section>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {room.id ? (
-          <Link href={`/rooms/${room.id}`} className="group flex items-center gap-1">
+          <Link href={`/rooms/${room.id}`} transitionTypes={NAV_FORWARD} className="group flex items-center gap-1">
             <h2 className="h2 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{room.name}</h2>
             <ChevronIcon className="size-4 text-stone-400" />
           </Link>
@@ -135,7 +138,7 @@ function RoomSection({ room }: { room: RoomSummary }) {
           </span>
         )}
         {room.id && !room.floor_plan && (
-          <Link href={`/rooms/${room.id}`} className="ml-auto flex items-center gap-1 rounded-full px-2 py-1 text-sm text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950">
+          <Link href={`/rooms/${room.id}`} transitionTypes={NAV_FORWARD} className="ml-auto flex items-center gap-1 rounded-full px-2 py-1 text-sm text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950">
             <MapIcon className="size-4" /> Karte anlegen
           </Link>
         )}
@@ -159,7 +162,7 @@ function Welcome({ hasRooms }: { hasRooms: boolean }) {
       <ol className="mt-4 space-y-2">
         {steps.map((s, i) => (
           <li key={s.title}>
-            <Link href={s.href} className="flex items-center gap-3 rounded-2xl border border-stone-200 p-3 transition hover:bg-stone-50 dark:border-stone-800 dark:hover:bg-stone-800/50">
+            <Link href={s.href} transitionTypes={NAV_FORWARD} className="row flex items-center gap-3 rounded-2xl border border-stone-200 p-3 hover:bg-stone-50 active:bg-stone-100 dark:border-stone-800 dark:hover:bg-stone-800/50">
               <span className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-medium ${s.done ? "bg-emerald-700 text-white" : "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300"}`}>
                 {s.done ? "✓" : i + 1}
               </span>

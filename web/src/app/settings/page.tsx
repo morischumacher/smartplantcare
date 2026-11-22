@@ -8,20 +8,23 @@ import { summarize, usd } from "@/lib/ai-cost";
 import { getAiUsage, getArchivedPlants, getNotifySettings, getRooms, getSensors, getVacations } from "@/lib/data";
 import { date } from "@/lib/format";
 import { silentSensors } from "@/lib/sensors";
+import { PageTransition } from "@/components/page-transition";
 
 export const metadata: Metadata = { title: "Einstellungen" };
 
 export default function SettingsPage() {
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <h1>Einstellungen</h1>
-      <Suspense fallback={<Skeleton className="h-80" />}>
-        <Menu />
-      </Suspense>
-      <form action={signOut} className="sm:hidden">
-        <button className="btn-ghost w-full">Abmelden</button>
-      </form>
-    </div>
+    <PageTransition>
+      <div className="mx-auto max-w-2xl space-y-6">
+        <h1>Einstellungen</h1>
+        <Suspense fallback={<Skeleton className="h-80" />}>
+          <Menu />
+        </Suspense>
+        <form action={signOut} className="sm:hidden">
+          <button className="btn-ghost w-full">Abmelden</button>
+        </form>
+      </div>
+    </PageTransition>
   );
 }
 

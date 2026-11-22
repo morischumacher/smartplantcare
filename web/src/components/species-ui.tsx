@@ -9,6 +9,7 @@ import { ChevronIcon, LeafIcon, SparkIcon } from "@/components/icons";
 import { normalize } from "@/lib/search";
 import { num } from "@/lib/format";
 import type { Species } from "@/lib/types";
+import { NAV_FORWARD } from "@/components/page-transition";
 
 export function SpeciesImage({ species, className = "" }: { species: Pick<Species, "image_url" | "common_name_de">; className?: string }) {
   return species.image_url ? (
@@ -56,7 +57,7 @@ export function SpeciesBrowser({ species }: { species: Species[] }) {
       {shown.length > 0 && <ul className="card divide-y divide-stone-100 overflow-hidden dark:divide-stone-800">
         {shown.map((s) => (
           <li key={s.id}>
-            <Link href={`/species/${s.id}`} className="group flex items-center gap-3 px-4 py-2.5 transition hover:bg-stone-50 active:bg-stone-100 dark:hover:bg-stone-800/40 dark:active:bg-stone-800">
+            <Link href={`/species/${s.id}`} transitionTypes={NAV_FORWARD} className="row group flex items-center gap-3 px-4 py-2.5 hover:bg-stone-50 active:bg-stone-100 dark:hover:bg-stone-800/40 dark:active:bg-stone-800">
               <SpeciesImage species={s} className="size-12 shrink-0 rounded-xl" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{s.common_name_de}</span>

@@ -4,17 +4,20 @@ import { RoomForm } from "@/components/settings-forms";
 import { SettingsHeader } from "@/components/settings-ui";
 import { Skeleton } from "@/components/ui";
 import { getRooms, getSensors } from "@/lib/data";
+import { PageTransition } from "@/components/page-transition";
 
 export const metadata: Metadata = { title: "Räume" };
 
 export default function RoomsSettingsPage() {
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
-      <SettingsHeader title="Räume">Pflanzen in einem Raum teilen sich das Raumklima. Pro Raum misst ein Hygrometer Luftfeuchte und Temperatur.</SettingsHeader>
-      <Suspense fallback={<Skeleton className="h-64" />}>
-        <Rooms />
-      </Suspense>
-    </div>
+    <PageTransition>
+      <div className="mx-auto max-w-2xl space-y-5">
+        <SettingsHeader title="Räume">Pflanzen in einem Raum teilen sich das Raumklima. Pro Raum misst ein Hygrometer Luftfeuchte und Temperatur.</SettingsHeader>
+        <Suspense fallback={<Skeleton className="h-64" />}>
+          <Rooms />
+        </Suspense>
+      </div>
+    </PageTransition>
   );
 }
 

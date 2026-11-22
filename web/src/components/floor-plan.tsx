@@ -18,6 +18,16 @@ const PAD = 0.45; // metres of margin around the room
 const STACK_M = 0.3; // pins closer than this share a spot (e.g. shelves of one cupboard)
 const STACK_GAP = 0.42;
 
+/** Resistance past a wall: the further out, the less the pin follows (never more than `dim`). */
+function rubberband(overshoot: number, dim: number, c = 0.55) {
+  return (overshoot * dim * c) / (dim + c * Math.abs(overshoot));
+}
+function rubber(v: number, lo: number, hi: number) {
+  if (v < lo) return lo - rubberband(lo - v, PAD);
+  if (v > hi) return hi + rubberband(v - hi, PAD);
+  return v;
+}
+
 /** Spreads pins that stand at the same spot (stacked on shelves) into a column, highest on top. */
 function spread<T extends { pos: PlantPos }>(entries: T[]): (T & { shown: Pos })[] {
   const groups: T[][] = [];
@@ -107,7 +117,8 @@ export function FloorPlanMap({
   const svgRef = useRef<SVGSVGElement>(null);
   const [active, setActive] = useState<string | null>(null);
   const [pinned, setPinned] = useState<string | null>(null);
-  const drag = useRef<{ kind: "plant" | "furniture"; id: string; index: number; offset: Pos } | null>(null);
+  const drag = useRef<{ kind: "plant" | "furniture"; id: string; index: number; offset: Pos; last: Pos } | null>(null);
+  const [dragging, setDragging] = useState<string | null>(null);
 
   const w = plan.width_m;
   const d = plan.depth_m;
@@ -147,18 +158,24 @@ export function FloorPlanMap({
     e.stopPropagation();
     (e.target as Element).setPointerCapture(e.pointerId);
     const p = toRoom(e);
-    drag.current = { kind, id, index, offset: sub(p, origin) };
+    drag.current = { kind, id, index, offset: sub(p, origin), last: origin };
+    if (kind === "plant") setDragging(id);
     if (kind === "furniture") onSelect?.({ kind: "furniture", index });
   }
   function moveDrag(e: React.PointerEvent) {
     const dr = drag.current;
     if (!dr) return;
     const p = sub(toRoom(e), dr.offset);
-    if (dr.kind === "plant") onMovePlant?.(dr.id, clamp(p));
+    dr.last = p;
+    // pins follow past the walls with growing resistance and settle back inside on release
+    if (dr.kind === "plant") onMovePlant?.(dr.id, { x: rubber(p.x, 0, w), y: rubber(p.y, 0, d) });
     else onMoveFurniture?.(dr.index, clamp(p));
   }
   const endDrag = () => {
+    const dr = drag.current;
     drag.current = null;
+    setDragging(null);
+    if (dr?.kind === "plant") onMovePlant?.(dr.id, clamp(dr.last));
   };
 
   const shown = pinned ?? active;
@@ -172,6 +189,7 @@ export function FloorPlanMap({
         className="h-auto w-full touch-none"
         onPointerMove={moveDrag}
         onPointerUp={endDrag}
+        onPointerCancel={endDrag}
         onPointerDown={() => {
           setPinned(null);
           onSelect?.(null);
@@ -347,6 +365,7 @@ export function FloorPlanMap({
           const r = 0.17;
           const lit = highlight === plant.id;
           const isActive = lit || shown === plant.id || (selected?.kind === "plant" && selected.id === plant.id);
+          const lifted = dragging === plant.id;
           const stacked = at.y !== pos.y;
           const height = heightLabel(pos.h);
           const label = height ? `${plant.name} · ${height}` : plant.name;
@@ -355,9 +374,13 @@ export function FloorPlanMap({
           return (
             <g
               key={plant.id}
-              transform={`translate(${at.x} ${at.y})`}
+              // CSS transform (user units) so a released pin glides to its spot; while dragging it tracks 1:1
+              style={{
+                transform: `translate(${at.x}px, ${at.y}px)`,
+                transition: lifted ? "opacity 200ms" : "transform 380ms var(--ease-fluid), opacity 200ms",
+              }}
               opacity={highlight && !lit ? 0.35 : 1}
-              className={`transition-opacity ${editable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
+              className={`motion-reduce:transition-none! ${editable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
               onPointerEnter={(e) => e.pointerType === "mouse" && setActive(plant.id)}
               onPointerDown={(e) => {
                 e.stopPropagation();
@@ -380,7 +403,8 @@ export function FloorPlanMap({
               )}
               {lit && <circle r={r * 1.9} fill="none" className="pointer-events-none stroke-emerald-600 dark:stroke-emerald-400" strokeWidth="0.035" />}
               <circle
-                r={lit ? r * 1.35 : isActive ? r * 1.15 : r}
+                r={lifted ? r * 1.35 : lit ? r * 1.35 : isActive ? r * 1.15 : r}
+                style={{ transition: "r 200ms var(--ease-fluid)" }}
                 fill={STATUS[plant.status].fill}
                 stroke="white"
                 strokeWidth="0.045"

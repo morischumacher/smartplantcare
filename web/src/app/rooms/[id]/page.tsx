@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui";
 import { getCandidates, getRoom, getSpeciesList, getSummary, signedUrls } from "@/lib/data";
 import { isUuid, num } from "@/lib/format";
 import type { FloorPlan } from "@/lib/types";
+import { NAV_BACK, NAV_FORWARD, PageTransition } from "@/components/page-transition";
 
 export async function generateMetadata({ params }: PageProps<"/rooms/[id]">): Promise<Metadata> {
   const { id } = await params;
@@ -19,9 +20,11 @@ export async function generateMetadata({ params }: PageProps<"/rooms/[id]">): Pr
 
 export default function RoomPage({ params }: PageProps<"/rooms/[id]">) {
   return (
-    <Suspense fallback={<Skeleton className="h-[32rem]" />}>
-      <Room params={params} />
-    </Suspense>
+    <PageTransition>
+      <Suspense fallback={<Skeleton className="h-[32rem]" />}>
+        <Room params={params} />
+      </Suspense>
+    </PageTransition>
   );
 }
 
@@ -39,10 +42,10 @@ async function Room({ params }: Pick<PageProps<"/rooms/[id]">, "params">) {
     // Found-but-not-added plants and the plant list come first on phones; the floor plan and its setup tools follow.
     <div className="flex flex-col gap-5">
       <div>
-        <p className="hidden text-sm text-stone-500 sm:block"><Link href="/" className="hover:underline">Übersicht</Link></p>
+        <p className="hidden text-sm text-stone-500 sm:block"><Link href="/" transitionTypes={NAV_BACK} className="hover:underline">Übersicht</Link></p>
         <div className="flex items-start justify-between gap-3">
           <h1>{room.name}</h1>
-          <Link href="/settings/rooms" className="btn-ghost shrink-0 px-3">Bearbeiten</Link>
+          <Link href="/settings/rooms" transitionTypes={NAV_FORWARD} className="btn-ghost shrink-0 px-3">Bearbeiten</Link>
         </div>
         {climate && (
           <p className="text-sm text-stone-500">

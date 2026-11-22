@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui";
 import { getPlant, getRooms, getSensors, getSpeciesList } from "@/lib/data";
 import { SOIL_TYPES, date, isUuid, num } from "@/lib/format";
 import { sensorOptions } from "@/lib/sensors";
+import { NAV_BACK, PageTransition } from "@/components/page-transition";
 
 export async function generateMetadata({ params }: PageProps<"/plants/[id]/settings">): Promise<Metadata> {
   const { id } = await params;
@@ -17,11 +18,13 @@ export async function generateMetadata({ params }: PageProps<"/plants/[id]/setti
 
 export default function PlantSettingsPage({ params }: PageProps<"/plants/[id]/settings">) {
   return (
-    <div className="mx-auto max-w-2xl">
-      <Suspense fallback={<Skeleton className="h-[40rem]" />}>
-        <Settings params={params} />
-      </Suspense>
-    </div>
+    <PageTransition>
+      <div className="mx-auto max-w-2xl">
+        <Suspense fallback={<Skeleton className="h-[40rem]" />}>
+          <Settings params={params} />
+        </Suspense>
+      </div>
+    </PageTransition>
   );
 }
 
@@ -34,7 +37,7 @@ async function Settings({ params }: Pick<PageProps<"/plants/[id]/settings">, "pa
   return (
     <div className="space-y-6">
       <div>
-        <p className="hidden text-sm text-stone-500 sm:block"><Link href={`/plants/${id}`} className="hover:underline">← {plant.name}</Link></p>
+        <p className="hidden text-sm text-stone-500 sm:block"><Link href={`/plants/${id}`} transitionTypes={NAV_BACK} className="hover:underline">← {plant.name}</Link></p>
         <h1>Bearbeiten</h1>
       </div>
       <section className="card p-5">

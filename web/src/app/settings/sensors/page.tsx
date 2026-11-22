@@ -7,22 +7,25 @@ import { Empty, Skeleton } from "@/components/ui";
 import { getIgnoredSensors, getRooms, getSensors } from "@/lib/data";
 import { relTime } from "@/lib/format";
 import { silentSensors } from "@/lib/sensors";
+import { NAV_FORWARD, PageTransition } from "@/components/page-transition";
 
 export const metadata: Metadata = { title: "Sensoren" };
 
 export default function SensorsPage() {
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
-      <SettingsHeader title="Sensoren">
-        Neue Sensoren tauchen automatisch auf, sobald das Gateway sie empfängt. Gib ihnen einen Namen, den du am Sensor wiedererkennst. Welcher Sensor in welcher Pflanze steckt, legst du bei der Pflanze unter „Bearbeiten“ fest. Sensoren, die nicht dir gehören (z. B. beim Nachbarn), kannst du ignorieren.
-      </SettingsHeader>
-      <Suspense fallback={<Skeleton className="h-64" />}>
-        <Sensors />
-      </Suspense>
-      <Suspense>
-        <Ignored />
-      </Suspense>
-    </div>
+    <PageTransition>
+      <div className="mx-auto max-w-2xl space-y-5">
+        <SettingsHeader title="Sensoren">
+          Neue Sensoren tauchen automatisch auf, sobald das Gateway sie empfängt. Gib ihnen einen Namen, den du am Sensor wiedererkennst. Welcher Sensor in welcher Pflanze steckt, legst du bei der Pflanze unter „Bearbeiten“ fest. Sensoren, die nicht dir gehören (z. B. beim Nachbarn), kannst du ignorieren.
+        </SettingsHeader>
+        <Suspense fallback={<Skeleton className="h-64" />}>
+          <Sensors />
+        </Suspense>
+        <Suspense>
+          <Ignored />
+        </Suspense>
+      </div>
+    </PageTransition>
   );
 }
 
@@ -45,7 +48,7 @@ async function Sensors() {
             {s.type !== "hygrometer" && (
               <p className="text-sm">
                 {plant ? (
-                  <>Steckt in <Link href={`/plants/${plant.plant_id}`} className="font-medium text-emerald-700 hover:underline dark:text-emerald-400">{plantName(plant.plants)}</Link></>
+                  <>Steckt in <Link href={`/plants/${plant.plant_id}`} transitionTypes={NAV_FORWARD} className="font-medium text-emerald-700 hover:underline dark:text-emerald-400">{plantName(plant.plants)}</Link></>
                 ) : (
                   <span className="text-amber-700 dark:text-amber-300">Noch keiner Pflanze zugeordnet</span>
                 )}

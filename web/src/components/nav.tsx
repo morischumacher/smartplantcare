@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "@/app/actions";
+import { NAV_BACK } from "@/components/page-transition";
 import { BookIcon, ChevronIcon, GearIcon, HomeIcon, LeafIcon } from "@/components/icons";
 
 // Top bar on every size; on phones the sections move into a tab bar at the bottom (thumb reach,
@@ -26,7 +27,7 @@ function backLink(path: string): { href: string; label: string } | null {
 
 function BackLink({ href, label }: { href: string; label: string }) {
   return (
-    <Link href={href} className="-ml-2 flex items-center gap-0.5 rounded-full py-1.5 pr-3 pl-1 text-base text-emerald-700 active:opacity-60 sm:hidden dark:text-emerald-400">
+    <Link href={href} transitionTypes={NAV_BACK} className="row -ml-2 flex items-center gap-0.5 rounded-full py-1.5 pr-3 pl-1 text-base text-emerald-700 active:opacity-50 sm:hidden dark:text-emerald-400">
       <ChevronIcon className="size-5 rotate-180" /> {label}
     </Link>
   );
@@ -70,14 +71,14 @@ export function Nav() {
                 key={href}
                 href={href}
                 aria-current={isActive(path, href) ? "page" : undefined}
-                className={`rounded-full px-3 py-1.5 transition hover:bg-stone-200/60 dark:hover:bg-stone-800 ${isActive(path, href) ? "bg-stone-200/70 font-medium dark:bg-stone-800" : "text-stone-600 dark:text-stone-400"}`}
+                className={`pressable rounded-full px-3 py-1.5 hover:bg-stone-200/60 dark:hover:bg-stone-800 ${isActive(path, href) ? "bg-stone-200/70 font-medium dark:bg-stone-800" : "text-stone-600 dark:text-stone-400"}`}
               >
                 {label}
               </Link>
             ))}
           </div>
           <form action={signOut} className="ml-auto hidden sm:block">
-            <button className="rounded-full px-3 py-1.5 text-stone-500 transition hover:bg-stone-200/60 dark:hover:bg-stone-800">Abmelden</button>
+            <button className="pressable rounded-full px-3 py-1.5 text-stone-500 hover:bg-stone-200/60 dark:hover:bg-stone-800">Abmelden</button>
           </form>
         </>
       )}
@@ -91,8 +92,8 @@ export function TabBar() {
   if (path === "/login") return null;
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200/80 bg-stone-50/90 backdrop-blur-xl sm:hidden dark:border-stone-800 dark:bg-stone-950/90"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="bar-material fixed inset-x-0 bottom-0 z-40 border-t border-stone-200/80 sm:hidden dark:border-stone-800"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)", viewTransitionName: "tab-bar" }}
     >
       <div className="grid grid-cols-3">
         {LINKS.map(({ href, label, Icon }) => {
@@ -102,9 +103,9 @@ export function TabBar() {
               key={href}
               href={href}
               aria-current={active ? "page" : undefined}
-              className={`flex flex-col items-center gap-0.5 pt-2 pb-1.5 text-[11px] font-medium transition ${active ? "text-emerald-700 dark:text-emerald-400" : "text-stone-500"}`}
+              className={`group row flex flex-col items-center gap-0.5 pt-2 pb-1.5 text-[11px] font-medium tracking-[0.01em] active:opacity-60 ${active ? "text-emerald-700 dark:text-emerald-400" : "text-stone-500"}`}
             >
-              <Icon className="size-6" />
+              <Icon className="size-6 transition-transform duration-200 ease-(--ease-fluid) group-active:scale-90 group-active:duration-0 motion-reduce:group-active:scale-100" />
               {label}
             </Link>
           );
