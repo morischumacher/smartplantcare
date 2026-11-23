@@ -52,7 +52,7 @@ Govee H5075 ─────────────┼─ BLE ─▶ Atom Lite /
 - **Sensoren** werden über ihre BLE-MAC-Adresse (Großbuchstaben, mit Doppelpunkten) identifiziert. Die Firmware erkennt Sensoren automatisch (keine MACs im YAML), unbekannte MACs legt `ingest` als neue Sensoren an.
 - **Firmware:** BLE-Auswertung liegt in `firmware/plant_ble.h` ohne ESPHome-Abhängigkeiten, damit sie am Mac testbar ist; das YAML ruft sie nur auf.
 - Vor größeren Entscheidungen (Framework, neue Dienste, Datenmodell-Umbauten) nachfragen.
-- Nach jedem Umsetzungsschritt testen, dann committen.
+- Nach jedem Umsetzungsschritt testen, dann committen und pushen – ohne Rückfrage, solange die Tests grün sind. Ablauf im Skill `/ship` (`.claude/skills/ship/`).
 
 ## Befehle
 
