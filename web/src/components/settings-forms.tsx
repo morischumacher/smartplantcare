@@ -2,7 +2,7 @@
 
 import { ConfirmButton } from "@/components/confirm-button";
 import { useState, useSyncExternalStore, useTransition } from "react";
-import { addVacation, deleteRoom, deleteSensor, deleteVacation, ignoreSensor, restorePlant, unignoreSensor, saveNotifySettings, saveRoom, saveSensor, sendTestPush, type ActionResult } from "@/app/actions";
+import { addVacation, deleteRoom, saveWateringDays, deleteSensor, deleteVacation, ignoreSensor, restorePlant, unignoreSensor, saveNotifySettings, saveRoom, saveSensor, sendTestPush, type ActionResult } from "@/app/actions";
 import { FormStatus, useFormAction } from "@/components/form-status";
 
 type Option = { id: string; name: string };
@@ -124,6 +124,44 @@ export function DeleteVacation({ id }: { id: string }) {
 /** Random, hard-to-guess topic: anyone who knows the topic can read the notifications. */
 function newTopic() {
   return `pflanzen-${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
+}
+
+export const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
+/** Weekday toggles (ISO 1–7) for the shared watering routine. */
+export function WateringDaysForm({ days }: { days: number[] }) {
+  const [state, onSubmit, pending] = useFormAction(saveWateringDays);
+  const [picked, setPicked] = useState(days);
+  return (
+    <form onSubmit={onSubmit} className="space-y-3">
+      <div className="flex flex-wrap gap-1.5">
+        {WEEKDAYS.map((label, i) => {
+          const day = i + 1;
+          const on = picked.includes(day);
+          return (
+            <label
+              key={day}
+              className={`flex size-11 cursor-pointer items-center justify-center rounded-full text-sm font-medium transition ${on ? "bg-emerald-700 text-white dark:bg-emerald-500 dark:text-emerald-950" : "bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700"}`}
+            >
+              <input
+                type="checkbox"
+                name="day"
+                value={day}
+                checked={on}
+                onChange={() => setPicked((cur) => (on ? cur.filter((d) => d !== day) : [...cur, day]))}
+                className="sr-only"
+              />
+              {label}
+            </label>
+          );
+        })}
+      </div>
+      <div className="flex items-center gap-2">
+        <button className="btn" disabled={pending}>Speichern</button>
+        <FormStatus state={state} />
+      </div>
+    </form>
+  );
 }
 
 export function NotifyForm({ settings }: { settings: { ntfy_topic: string | null; quiet_from: number | null; quiet_to: number | null } }) {

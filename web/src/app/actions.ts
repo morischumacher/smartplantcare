@@ -503,6 +503,20 @@ export async function deleteVacation(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+// --- Watering routine ------------------------------------------------------
+
+export async function saveWateringDays(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  const days = fd.getAll("day").map(Number).filter((d) => Number.isInteger(d) && d >= 1 && d <= 7);
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("care_settings")
+    .update({ watering_days: [...new Set(days)].sort(), updated_at: new Date().toISOString() })
+    .eq("id", true);
+  if (error) return fail(error);
+  refresh();
+  return { ok: true, message: days.length ? "Gespeichert" : "Gespeichert – jede Pflanze an ihrem eigenen Tag" };
+}
+
 // --- Notifications ---------------------------------------------------------
 
 const NTFY_SERVER = "https://ntfy.sh";

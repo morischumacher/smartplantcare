@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { signOut } from "@/app/actions";
-import { ArchiveIcon, BellIcon, DoorIcon, SensorIcon, SparkIcon, SuitcaseIcon } from "@/components/icons";
+import { ArchiveIcon, BellIcon, DropIcon, DoorIcon, SensorIcon, SparkIcon, SuitcaseIcon } from "@/components/icons";
 import { SettingsRow } from "@/components/settings-ui";
 import { Skeleton } from "@/components/ui";
 import { summarize, usd } from "@/lib/ai-cost";
-import { getAiUsage, getArchivedPlants, getNotifySettings, getRooms, getSensors, getVacations } from "@/lib/data";
+import { getAiUsage, getArchivedPlants, getCareSettings, getNotifySettings, getRooms, getSensors, getVacations } from "@/lib/data";
 import { date } from "@/lib/format";
 import { silentSensors } from "@/lib/sensors";
 import { PageTransition } from "@/components/page-transition";
@@ -30,14 +30,16 @@ export default function SettingsPage() {
 
 // One row per area with its current state, so you see at a glance what is set up and what needs attention.
 async function Menu() {
-  const [rooms, sensors, vacations, notify, archived, usage] = await Promise.all([
+  const [rooms, sensors, vacations, notify, archived, usage, care] = await Promise.all([
     getRooms(),
     getSensors(),
     getVacations(),
     getNotifySettings(),
     getArchivedPlants(),
     getAiUsage().catch(() => []),
+    getCareSettings(),
   ]);
+  const days = care?.watering_days ?? [];
   const ai = summarize(usage);
   const soil = sensors.filter((s) => s.type !== "hygrometer");
   const hygro = sensors.length - soil.length;
@@ -70,6 +72,12 @@ async function Menu() {
                   : [`${soil.length} Bodensensor${soil.length === 1 ? "" : "en"}`, hygro && `${hygro} Hygrometer`].filter(Boolean).join(" · ")
           }
           warn={silent > 0 || unassigned > 0}
+        />
+        <SettingsRow
+          href="/settings/watering"
+          icon={<DropIcon className="size-5" />}
+          title="Gießtage"
+          detail={days.length ? days.map((d) => ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"][d - 1]).join(", ") : "Aus – jede Pflanze an ihrem eigenen Tag"}
         />
         <SettingsRow
           href="/settings/notifications"

@@ -186,7 +186,9 @@ export function FloorPlanMap({
       <svg
         ref={svgRef}
         viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
-        className="h-auto w-full touch-none"
+        // only the editor needs touch-none (dragging pins and furniture); in the normal view a swipe
+        // over the plan must still scroll the page
+        className={`h-auto w-full ${editable ? "touch-none" : ""}`}
         onPointerMove={moveDrag}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}

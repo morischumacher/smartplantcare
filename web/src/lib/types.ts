@@ -24,6 +24,8 @@ export interface PlantSummary {
   /** set automatically in winter: "pause" for every plant, "rest" for species with a winter rest */
   winter: "pause" | "rest" | null;
   winter_note: string | null;
+  /** watering routine: on a watering day ("day") or once in between ("extra"); null without routine */
+  routine: { kind: "day" | "extra"; at: string; ml: number | null; too_fast: boolean } | null;
   /** daily light peak that is normal this month (winter only) */
   light_season: { min: number | null; max: number | null } | null;
   status: Status;
@@ -69,6 +71,8 @@ export interface RoomSummary {
 
 export interface Summary {
   generated_at: string;
+  /** shared watering days (ISO weekdays), the next one and who gets water then; null = off */
+  routine: { weekdays: number[]; next_day: string | null; plants: { id: string; name: string; ml: number | null }[] } | null;
   attention: number;
   rooms: RoomSummary[];
 }

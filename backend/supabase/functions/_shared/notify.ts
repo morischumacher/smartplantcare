@@ -49,25 +49,39 @@ const HOUR = 3_600_000;
 export const REMIND_AFTER = 24 * HOUR;
 export const RESEND_GAP = 12 * HOUR;
 export const SENSOR_SILENT_AFTER = 6 * HOUR;
-/** plant hints worth a push; info hints stay in the app */
-const PUSH_HINTS = new Set(["stays_wet", "dries_fast", "no_recovery", "too_cold", "too_hot"]);
+/** plant hints worth a push (something to do soon); advice such as "dries fast" or "barely rose
+ *  after watering" stays in the app */
+const PUSH_HINTS = new Set(["stays_wet", "too_cold", "too_hot"]);
 
 export function collectEvents(summary: NotifyInput, sensors: NotifySensor[], now: number): NotifyEvent[] {
   const events: NotifyEvent[] = [];
+  // all plants to water now in one message (a watering day is one push, not one per plant)
+  const thirsty = summary.rooms.flatMap((r) => r.plants).filter((p) => p.status === "water_now");
+  if (thirsty.length === 1) {
+    const p = thirsty[0];
+    const amount = p.recommended_ml ? ` – bitte ca. ${p.recommended_ml} ml gießen` : " – bitte gießen";
+    events.push({
+      key: `water:${p.id}`,
+      title: `${p.name} gießen`,
+      message: `${p.name}: ${p.moisture === null ? "zu trocken" : `${Math.round(p.moisture)} %`}${amount}`,
+      priority: 4,
+      tags: ["droplet"],
+      critical: false,
+      path: `/plants/${p.id}`,
+    });
+  } else if (thirsty.length > 1) {
+    events.push({
+      key: "water:all",
+      title: `${thirsty.length} Pflanzen gießen`,
+      message: thirsty.map((p) => (p.recommended_ml ? `${p.name} ca. ${p.recommended_ml} ml` : p.name)).join(", "),
+      priority: 4,
+      tags: ["droplet"],
+      critical: false,
+      path: "/",
+    });
+  }
   for (const room of summary.rooms) {
     for (const p of room.plants) {
-      if (p.status === "water_now") {
-        const amount = p.recommended_ml ? ` – bitte ca. ${p.recommended_ml} ml gießen` : " – bitte gießen";
-        events.push({
-          key: `water:${p.id}`,
-          title: `${p.name} gießen`,
-          message: `${p.name}: ${p.moisture === null ? "zu trocken" : `${Math.round(p.moisture)} %`}${amount}`,
-          priority: 4,
-          tags: ["droplet"],
-          critical: false,
-          path: `/plants/${p.id}`,
-        });
-      }
       for (const h of p.hints) {
         if (h.severity !== "warning" || !PUSH_HINTS.has(h.code)) continue;
         events.push({

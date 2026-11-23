@@ -93,6 +93,24 @@ async function Overview() {
         </section>
       )}
 
+      {summary.routine?.next_day && thirsty.length === 0 && (
+        <Link href="/settings/watering" transitionTypes={NAV_FORWARD} className="card flex items-center gap-3 p-4 text-sm">
+          <DropIcon className="size-5 shrink-0 text-sky-700 dark:text-sky-300" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-medium">
+              Nächster Gießtag:{" "}
+              {new Date(summary.routine.next_day).toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "numeric", timeZone: "Europe/Berlin" })}
+            </span>
+            <span className="block text-stone-500">
+              {summary.routine.plants.length === 0
+                ? "Nichts zu gießen – alle halten bis zum Gießtag danach"
+                : summary.routine.plants.map((p) => (p.ml ? `${p.name} ca. ${num(p.ml)} ml` : p.name)).join(" · ")}
+            </span>
+          </span>
+          <ChevronIcon className="size-4 shrink-0 text-stone-400" />
+        </Link>
+      )}
+
       {plants.length === 0 && (
         <Welcome hasRooms={summary.rooms.some((r) => r.id)} />
       )}

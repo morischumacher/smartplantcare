@@ -26,10 +26,14 @@ async function query<T>(p: PromiseLike<{ data: T | null; error: unknown }>): Pro
   return data as T;
 }
 
+// Optional ntfy access token: without it ntfy.sh counts messages per IP, and the Edge Functions
+// share their IPs with other Supabase projects – the anonymous daily quota is then often used up.
+const NTFY_TOKEN = Deno.env.get("NTFY_TOKEN") ?? "";
+
 async function publish(topic: string, webUrl: string, e: NotifyEvent): Promise<boolean> {
   const res = await fetch(NTFY_SERVER, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(NTFY_TOKEN ? { Authorization: `Bearer ${NTFY_TOKEN}` } : {}) },
     body: JSON.stringify({ topic, title: e.title, message: e.message, priority: e.priority, tags: e.tags, click: webUrl + e.path }),
   });
   if (!res.ok) console.error("ntfy failed", res.status, await res.text());

@@ -16,6 +16,7 @@ import { climateAlerts, plantTemperatureHint } from "../_shared/climate.ts";
 import { compactSummary } from "../_shared/compact.ts";
 import { plantDetail, roomDetail } from "../_shared/detail.ts";
 import { seasonTargets, winterNote } from "../_shared/season.ts";
+import { applyRoutine, wateringDays } from "../_shared/schedule.ts";
 import { type HourPoint, type PlantInput, type PlantSummary, type Pot, type PotPeriod, potVolumeL, summarize } from "../_shared/watering.ts";
 
 const supabase = createClient(
@@ -72,7 +73,7 @@ function climateStatus(humidity: number | null, min: number, max: number) {
 type History = Map<string, { series: HourPoint[]; waterings: { ts: number }[] }>;
 
 async function buildSummary(now: number, history: History = new Map()) {
-  const [rooms, plants, pots, links, latest, photos, species] = await Promise.all([
+  const [rooms, plants, pots, links, latest, photos, species, care] = await Promise.all([
     query(supabase.from("rooms").select("id, name, humidity_min, humidity_max, floor_plan").order("name")),
     query(supabase.from("plants").select("id, name, species, species_id, room_id, moisture_min, moisture_max, temp_min_c, temp_max_c, light_min_lux, light_max_lux, conductivity_min, conductivity_max, photo_interval_days, created_at, map_x, map_y, map_height_m").is("archived_at", null).order("name")),
     query(supabase.from("pots").select("plant_id, started_at, volume_l, diameter_cm, soil_type").order("started_at", { ascending: false })),
@@ -80,7 +81,11 @@ async function buildSummary(now: number, history: History = new Map()) {
     query(supabase.from("sensor_latest").select("sensor_id, type, room_id, ts, moisture, temperature, light, conductivity, humidity")),
     query(supabase.from("plant_photos").select("plant_id, taken_at, analysis").order("taken_at", { ascending: false })),
     query(supabase.from("species").select("id, winter_rest, winter_moisture_min")),
+    query(supabase.from("care_settings").select("watering_days").maybeSingle()),
   ]);
+  // watering routine: the coming watering days (noon Berlin), empty = every plant on its own day
+  const weekdays: number[] = (care as { watering_days: number[] } | null)?.watering_days ?? [];
+  const days = wateringDays(weekdays, now);
   const speciesById = new Map(species.map((s) => [s.id, s]));
 
   const latestBySensor = new Map(latest.map((r) => [r.sensor_id, r]));
@@ -149,6 +154,21 @@ async function buildSummary(now: number, history: History = new Map()) {
       now,
     };
     const s: PlantSummary = summarize(input);
+    const routine = applyRoutine({
+      status: s.status,
+      moisture: s.moisture,
+      min: input.moisture_min,
+      max: input.moisture_max,
+      next_watering_at: s.next_watering_at,
+      recommended_ml: s.recommended_ml,
+      dry_rate_per_day: s.learning.dry_rate_per_day,
+      ml_per_point: s.learning.ml_per_point,
+      hints: s.hints,
+    }, days, now);
+    s.status = routine.status as PlantSummary["status"];
+    s.next_watering_at = routine.next_watering_at;
+    s.recommended_ml = routine.recommended_ml;
+    s.hints = routine.hints;
 
     // Findings of the AI photo check, while the photo is recent.
     const analysis = lastPhoto?.analysis as { health?: string; summary?: string } | null;
@@ -187,6 +207,8 @@ async function buildSummary(now: number, history: History = new Map()) {
         ec: { min: num(plant.conductivity_min), max: num(plant.conductivity_max) },
       },
       winter_note: winterNote(season.winter),
+      // on a watering day ("day") or in between ("extra"), null without routine or data
+      routine: routine.routine ? { kind: routine.routine.kind, at: iso(routine.routine.at), ml: routine.routine.ml, too_fast: routine.routine.too_fast } : null,
       status: s.status,
       recommended_ml: s.recommended_ml,
       next_watering_at: iso(s.next_watering_at),
@@ -257,8 +279,16 @@ async function buildSummary(now: number, history: History = new Map()) {
     }
   }
 
+  // the next watering day and who gets water on it
+  const nextDay = days[0] ?? null;
+  const onNextDay = nextDay === null ? [] : plantSummaries.filter((p) => p.routine?.kind === "day" && p.routine.at === iso(nextDay));
   return {
     generated_at: iso(now),
+    routine: weekdays.length === 0 ? null : {
+      weekdays,
+      next_day: iso(nextDay),
+      plants: onNextDay.map((p) => ({ id: p.id, name: p.name, ml: p.routine!.ml })),
+    },
     alerts,
     attention: plantSummaries.filter((p) => p.status === "water_now" || p.status === "water_soon").length,
     rooms: roomEntries,

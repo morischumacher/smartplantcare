@@ -68,3 +68,13 @@ test("quiet hours in Berlin time, also across midnight", () => {
   assert.equal(inQuietHours(NOW, 12, 14), true);
   assert.equal(inQuietHours(NOW, null, null), false);
 });
+
+test("several plants to water: one message with all of them", () => {
+  const plant = (id: string, name: string, ml: number | null) =>
+    ({ id, name, status: "water_now", moisture: 15, recommended_ml: ml, hints: [] });
+  const events = collectEvents({ rooms: [{ name: "Zimmer", plants: [plant("a", "Efeutute", 200), plant("b", "Tür", null)] }], alerts: [] }, [], 0);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].key, "water:all");
+  assert.equal(events[0].title, "2 Pflanzen gießen");
+  assert.equal(events[0].message, "Efeutute ca. 200 ml, Tür");
+});

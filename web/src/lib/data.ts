@@ -151,6 +151,12 @@ export async function getNotifySettings() {
   return data as { ntfy_topic: string | null; quiet_from: number | null; quiet_to: number | null } | null;
 }
 
+export async function getCareSettings() {
+  const supabase = await createClient();
+  const { data } = await supabase.from("care_settings").select("watering_days").maybeSingle();
+  return data as { watering_days: number[] } | null;
+}
+
 export async function getVacations() {
   const supabase = await createClient();
   const { data, error } = await supabase
