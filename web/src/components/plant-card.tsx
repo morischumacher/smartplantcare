@@ -3,6 +3,7 @@ import { ChevronIcon } from "@/components/icons";
 import { STATUS, lightCategory, num } from "@/lib/format";
 import { plantTodos } from "@/lib/todos";
 import type { PlantSummary } from "@/lib/types";
+import { NAV_FORWARD } from "@/components/page-transition";
 
 // One plant as a list row (like iOS Settings): moisture badge, name, the most important thing to do.
 // Rows are short so a whole room fits on one phone screen.
@@ -32,7 +33,7 @@ export function PlantRow({ plant }: { plant: PlantSummary }) {
   const species = plant.species && plant.species !== plant.name ? plant.species : null;
 
   return (
-    <Link href={`/plants/${plant.id}`} className="group flex items-center gap-3 px-4 py-3 transition hover:bg-stone-50 active:bg-stone-100 dark:hover:bg-stone-800/40 dark:active:bg-stone-800">
+    <Link href={`/plants/${plant.id}`} transitionTypes={NAV_FORWARD} className="row group flex items-center gap-3 px-4 py-3 hover:bg-stone-50 active:bg-stone-100 dark:hover:bg-stone-800/40 dark:active:bg-stone-800">
       <span
         className="flex size-12 shrink-0 flex-col items-center justify-center rounded-full border-[3px] tabular-nums"
         style={{ borderColor: s.fill }}

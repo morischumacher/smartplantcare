@@ -6,6 +6,7 @@ import { ImageCredit, SpeciesForm, SpeciesImage } from "@/components/species-ui"
 import { Skeleton } from "@/components/ui";
 import { getSpecies } from "@/lib/data";
 import { SOIL_TYPES, isUuid, num } from "@/lib/format";
+import { NAV_BACK, PageTransition } from "@/components/page-transition";
 
 export async function generateMetadata({ params }: PageProps<"/species/[id]">): Promise<Metadata> {
   const { id } = await params;
@@ -15,9 +16,11 @@ export async function generateMetadata({ params }: PageProps<"/species/[id]">): 
 
 export default function SpeciesDetailPage({ params }: PageProps<"/species/[id]">) {
   return (
-    <Suspense fallback={<Skeleton className="h-[30rem]" />}>
-      <Detail params={params} />
-    </Suspense>
+    <PageTransition>
+      <Suspense fallback={<Skeleton className="h-[30rem]" />}>
+        <Detail params={params} />
+      </Suspense>
+    </PageTransition>
   );
 }
 
@@ -30,7 +33,7 @@ async function Detail({ params }: Pick<PageProps<"/species/[id]">, "params">) {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-stone-500"><Link href="/species" className="hover:underline">← Pflanzenarten</Link></p>
+      <p className="text-sm text-stone-500"><Link href="/species" transitionTypes={NAV_BACK} className="hover:underline">← Pflanzenarten</Link></p>
       <div className="grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <div className="space-y-1">
           <SpeciesImage species={s} className={`${s.image_url ? "aspect-[4/3]" : "aspect-[3/1]"} w-full rounded-2xl sm:aspect-square`} />

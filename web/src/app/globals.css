@@ -76,6 +76,8 @@
 
 :root {
   color-scheme: light dark;
+  /* Close to a critically damped spring (no overshoot), the default for anything that settles. */
+  --ease-fluid: cubic-bezier(0.32, 0.72, 0, 1);
   --halo-text: #eef6f0;
   -webkit-tap-highlight-color: transparent;
 }
@@ -83,6 +85,16 @@
   :root {
     --halo-text: #143a24;
   }
+}
+
+a,
+button,
+summary,
+label,
+input,
+select,
+textarea {
+  touch-action: manipulation; /* no double-tap-zoom delay on taps */
 }
 
 body {
@@ -110,20 +122,54 @@ h1,
   @apply min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/15 sm:min-h-10 sm:text-sm dark:border-stone-700 dark:bg-stone-950;
 }
 
+/* Small text reads better with a touch of positive tracking (large headings get negative). */
 .label {
-  @apply mb-1 block text-xs font-medium text-stone-500 dark:text-stone-400;
+  @apply mb-1 block text-xs font-medium tracking-[0.01em] text-stone-500 dark:text-stone-400;
 }
 
 .btn {
-  @apply inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition select-none hover:bg-emerald-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9 dark:bg-emerald-500 dark:text-emerald-950 dark:hover:bg-emerald-400;
+  @apply inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full bg-emerald-700 px-4 py-2 text-sm font-medium text-white pressable select-none hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9 dark:bg-emerald-500 dark:text-emerald-950 dark:hover:bg-emerald-400;
 }
 
 .btn-ghost {
-  @apply inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-stone-300 bg-white/60 px-4 py-2 text-sm font-medium transition select-none hover:bg-stone-100 active:scale-[0.98] disabled:opacity-50 sm:min-h-9 dark:border-stone-700 dark:bg-transparent dark:hover:bg-stone-800;
+  @apply inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-stone-300 bg-white/60 px-4 py-2 text-sm font-medium pressable select-none hover:bg-stone-100 disabled:opacity-50 sm:min-h-9 dark:border-stone-700 dark:bg-transparent dark:hover:bg-stone-800;
 }
 
 .btn-danger {
-  @apply inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium text-rose-600 transition select-none hover:bg-rose-50 active:scale-[0.98] disabled:opacity-50 sm:min-h-9 dark:text-rose-400 dark:hover:bg-rose-500/10;
+  @apply inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium text-rose-600 pressable select-none hover:bg-rose-50 disabled:opacity-50 sm:min-h-9 dark:text-rose-400 dark:hover:bg-rose-500/10;
+}
+
+/*
+ * Press feedback the way iOS does it: the highlight lands the instant the finger goes down
+ * (no transition on the way in) and eases off on release. Buttons shrink a little; list rows
+ * only change their background (see .row). Hover styles stay pointer-only (Tailwind gates them).
+ */
+@utility pressable {
+  transition-property: transform, background-color, border-color, color, opacity, box-shadow;
+  transition-duration: 220ms;
+  transition-timing-function: var(--ease-fluid);
+  touch-action: manipulation;
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+    transition-duration: 0ms;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &:active:not(:disabled) {
+      transform: none;
+      opacity: 0.7;
+    }
+  }
+}
+
+/* A tappable list row: instant highlight on press, fades out on release. */
+@utility row {
+  transition-property: background-color, opacity;
+  transition-duration: 220ms;
+  transition-timing-function: var(--ease-fluid);
+  touch-action: manipulation;
+  &:active {
+    transition-duration: 0ms;
+  }
 }
 
 /* Bottom tab bar on phones: keep content clear of it and of the home indicator. */
@@ -133,5 +179,135 @@ h1,
 @media (min-width: 640px) {
   .pb-tabbar {
     padding-bottom: 2rem;
+  }
+}
+
+/*
+ * Floating bars are a translucent material that content scrolls under. The header's hairline only
+ * appears once something actually sits beneath it (scroll edge effect); without scroll-driven
+ * animations it simply stays visible.
+ */
+.bar-material {
+  @apply bg-stone-50/80 backdrop-blur-xl backdrop-saturate-150 dark:bg-stone-950/80;
+}
+@supports (animation-timeline: scroll()) {
+  .scroll-edge {
+    animation: scroll-edge linear both;
+    animation-timeline: scroll(root block);
+    animation-range: 0 24px;
+  }
+  @keyframes scroll-edge {
+    from {
+      border-color: transparent;
+    }
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .bar-material {
+    @apply bg-stone-50 backdrop-blur-none dark:bg-stone-950;
+  }
+}
+@media (prefers-contrast: more) {
+  .bar-material {
+    @apply border-stone-400 bg-stone-50 backdrop-blur-none dark:border-stone-500 dark:bg-stone-950;
+  }
+  .scroll-edge {
+    animation: none;
+  }
+}
+
+/* <details> opens and closes along the same path instead of snapping (where the browser can). */
+@supports (interpolate-size: allow-keywords) {
+  :root {
+    interpolate-size: allow-keywords;
+  }
+  details::details-content {
+    block-size: 0;
+    overflow-y: clip;
+    opacity: 0;
+    transition:
+      block-size 320ms var(--ease-fluid),
+      opacity 200ms ease,
+      content-visibility 320ms allow-discrete;
+  }
+  details[open]::details-content {
+    block-size: auto;
+    opacity: 1;
+  }
+}
+
+/*
+ * Page transitions (React <ViewTransition>, see components/page-transition.tsx): going deeper
+ * slides in from the right, going back returns to the right, along the same path. Header and
+ * tab bar stay put as the spatial anchor. Tab switches and browser back carry no type: no motion.
+ */
+::view-transition {
+  pointer-events: none; /* taps during a transition reach the live page */
+}
+/* No page-wide cross-fade: untyped navigations (tabs, browser back) swap instantly. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-group(site-header),
+::view-transition-group(tab-bar) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(site-header),
+::view-transition-old(tab-bar) {
+  display: none;
+}
+::view-transition-new(site-header),
+::view-transition-new(tab-bar) {
+  animation: none;
+}
+::view-transition-old(.nav-forward) {
+  --slide: -48px;
+  animation:
+    160ms ease-in both vt-fade reverse,
+    380ms var(--ease-fluid) both vt-slide reverse;
+}
+::view-transition-new(.nav-forward) {
+  --slide: 48px;
+  animation:
+    220ms ease-out 80ms both vt-fade,
+    380ms var(--ease-fluid) both vt-slide;
+}
+::view-transition-old(.nav-back) {
+  --slide: 48px;
+  animation:
+    160ms ease-in both vt-fade reverse,
+    380ms var(--ease-fluid) both vt-slide reverse;
+}
+::view-transition-new(.nav-back) {
+  --slide: -48px;
+  animation:
+    220ms ease-out 80ms both vt-fade,
+    380ms var(--ease-fluid) both vt-slide;
+}
+@keyframes vt-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes vt-slide {
+  from {
+    translate: var(--slide) 0;
+  }
+}
+
+/* Reduced motion: keep the feedback, drop the movement. Slides become cross-fades, presses don't scale. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(.nav-forward),
+  ::view-transition-old(.nav-back) {
+    animation: 150ms ease both vt-fade reverse;
+  }
+  ::view-transition-new(.nav-forward),
+  ::view-transition-new(.nav-back) {
+    animation: 150ms ease both vt-fade;
+  }
+  details::details-content {
+    transition-property: opacity, content-visibility;
   }
 }

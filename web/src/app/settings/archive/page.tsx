@@ -5,17 +5,20 @@ import { SettingsHeader } from "@/components/settings-ui";
 import { Empty, Skeleton } from "@/components/ui";
 import { getArchivedPlants } from "@/lib/data";
 import { date } from "@/lib/format";
+import { PageTransition } from "@/components/page-transition";
 
 export const metadata: Metadata = { title: "Archiv" };
 
 export default function ArchivePage() {
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
-      <SettingsHeader title="Archiv">Archivierte Pflanzen mit Verlauf und Fotos. Nach dem Zurückholen den Sensor neu zuordnen.</SettingsHeader>
-      <Suspense fallback={<Skeleton className="h-40" />}>
-        <Archive />
-      </Suspense>
-    </div>
+    <PageTransition>
+      <div className="mx-auto max-w-2xl space-y-5">
+        <SettingsHeader title="Archiv">Archivierte Pflanzen mit Verlauf und Fotos. Nach dem Zurückholen den Sensor neu zuordnen.</SettingsHeader>
+        <Suspense fallback={<Skeleton className="h-40" />}>
+          <Archive />
+        </Suspense>
+      </div>
+    </PageTransition>
   );
 }
 

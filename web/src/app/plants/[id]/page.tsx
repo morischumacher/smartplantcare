@@ -10,6 +10,7 @@ import { PendingWaterings, WateringForm, WateringHistory } from "@/components/wa
 import { getHourly, getPhotos, getPlant, getSpecies, getSummary, getWaterings } from "@/lib/data";
 import { ImageCredit, SpeciesImage } from "@/components/species-ui";
 import { SOIL_TYPES, date, isUuid, lightCategory, num, relTime } from "@/lib/format";
+import { NAV_BACK, NAV_FORWARD, PageTransition } from "@/components/page-transition";
 
 export async function generateMetadata({ params }: PageProps<"/plants/[id]">): Promise<Metadata> {
   const { id } = await params;
@@ -19,9 +20,11 @@ export async function generateMetadata({ params }: PageProps<"/plants/[id]">): P
 
 export default function PlantPage({ params, searchParams }: PageProps<"/plants/[id]">) {
   return (
-    <Suspense fallback={<PlantSkeleton />}>
-      <Plant params={params} searchParams={searchParams} />
-    </Suspense>
+    <PageTransition>
+      <Suspense fallback={<PlantSkeleton />}>
+        <Plant params={params} searchParams={searchParams} />
+      </Suspense>
+    </PageTransition>
   );
 }
 
@@ -80,7 +83,7 @@ async function Plant({ params, searchParams }: Pick<PageProps<"/plants/[id]">, "
     </section>
     {species && (
       <section className="card overflow-hidden text-sm">
-        <Link href={`/species/${species.id}`} className="flex gap-3 p-4 hover:bg-stone-50 dark:hover:bg-stone-800/40">
+        <Link href={`/species/${species.id}`} transitionTypes={NAV_FORWARD} className="row flex gap-3 p-4 hover:bg-stone-50 active:bg-stone-100 dark:active:bg-stone-800 dark:hover:bg-stone-800/40">
           <SpeciesImage species={species} className="size-16 shrink-0 rounded-lg" />
           <div className="min-w-0">
             <p className="font-medium">{species.common_name_de}</p>
@@ -108,8 +111,8 @@ async function Plant({ params, searchParams }: Pick<PageProps<"/plants/[id]">, "
         {species && <SpeciesImage species={species} className="size-16 shrink-0 rounded-2xl" />}
         <div className="min-w-0 flex-1">
           <p className="hidden text-sm text-stone-500 sm:block">
-            <Link href="/" className="hover:underline">Übersicht</Link>
-            {room?.id && <> · <Link href={`/rooms/${room.id}`} className="hover:underline">{room.name}</Link></>}
+            <Link href="/" transitionTypes={NAV_BACK} className="hover:underline">Übersicht</Link>
+            {room?.id && <> · <Link href={`/rooms/${room.id}`} transitionTypes={NAV_BACK} className="hover:underline">{room.name}</Link></>}
           </p>
           <h1 className="truncate">{plant.name}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -122,7 +125,7 @@ async function Plant({ params, searchParams }: Pick<PageProps<"/plants/[id]">, "
             {plant.species && plant.species !== plant.name && <span className="text-sm text-stone-500 italic">{plant.species}</span>}
           </div>
         </div>
-        <Link href={`/plants/${id}/settings`} className="btn-ghost shrink-0 px-3">Bearbeiten</Link>
+        <Link href={`/plants/${id}/settings`} transitionTypes={NAV_FORWARD} className="btn-ghost shrink-0 px-3">Bearbeiten</Link>
       </div>
 
       {s.moisture == null && s.temperature == null ? (
@@ -253,7 +256,7 @@ function NoReadings({ plantId, hasSensor }: { plantId: string; hasSensor: boolea
             : "Ordne der Pflanze einen Bodensensor zu, dann erscheinen hier Feuchte, Licht, Temperatur und Dünger. Gießen eintragen geht auch ohne Sensor."}
         </p>
         {!hasSensor && (
-          <Link href={`/plants/${plantId}/settings`} className="mt-2 inline-block font-medium text-emerald-700 hover:underline dark:text-emerald-400">
+          <Link href={`/plants/${plantId}/settings`} transitionTypes={NAV_FORWARD} className="mt-2 inline-block font-medium text-emerald-700 hover:underline dark:text-emerald-400">
             Sensor zuordnen →
           </Link>
         )}

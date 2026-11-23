@@ -6,19 +6,22 @@ import { Skeleton } from "@/components/ui";
 import { getSummary, getVacations } from "@/lib/data";
 import { date } from "@/lib/format";
 import { sitterText } from "@/lib/sitter";
+import { PageTransition } from "@/components/page-transition";
 
 export const metadata: Metadata = { title: "Urlaub" };
 
 export default function VacationPage() {
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
-      <SettingsHeader title="Urlaub">
-        In dieser Zeit fließt Gießen nicht ins Lernen ein und es kommen nur kritische Benachrichtigungen. Wer für dich gießt, bekommt die Gießliste – per WhatsApp, Mail oder ausgedruckt.
-      </SettingsHeader>
-      <Suspense fallback={<Skeleton className="h-64" />}>
-        <Vacation />
-      </Suspense>
-    </div>
+    <PageTransition>
+      <div className="mx-auto max-w-2xl space-y-5">
+        <SettingsHeader title="Urlaub">
+          In dieser Zeit fließt Gießen nicht ins Lernen ein und es kommen nur kritische Benachrichtigungen. Wer für dich gießt, bekommt die Gießliste – per WhatsApp, Mail oder ausgedruckt.
+        </SettingsHeader>
+        <Suspense fallback={<Skeleton className="h-64" />}>
+          <Vacation />
+        </Suspense>
+      </div>
+    </PageTransition>
   );
 }
 

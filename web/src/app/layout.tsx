@@ -27,8 +27,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="de" className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
         <header
-          className="sticky top-0 z-30 border-b border-stone-200/70 bg-stone-50/85 backdrop-blur-xl dark:border-stone-800/70 dark:bg-stone-950/85"
-          style={{ paddingTop: "env(safe-area-inset-top)" }}
+          className="bar-material scroll-edge sticky top-0 z-30 border-b border-stone-200/70 dark:border-stone-800/70"
+          style={{ paddingTop: "env(safe-area-inset-top)", viewTransitionName: "site-header" }}
         >
           <Suspense fallback={<NavFallback />}>
             <Nav />
